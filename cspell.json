@@ -2,7 +2,8 @@
   "enabledFileTypes": {},
   "ignorePaths": [
     ".devcontainer/devcontainer.json",
-    ".devcontainer/Dockerfile"
+    ".devcontainer/Dockerfile",
+    ".devcontainer/post_create.sh"
   ],
   "words": []
 }
