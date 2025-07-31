@@ -21,7 +21,6 @@ cmake --version
 ninja --version
 valgrind --version
 perf --version
-/sbin/ldconfig -p | grep liburing
 
 rustc --version
 cargo --version
