@@ -7,3 +7,5 @@ services:
       - ../:/work
     network_mode: host
     restart: 'no'
+    security_opt:
+      - seccomp=unconfined
