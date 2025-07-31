@@ -18,6 +18,7 @@ RUN apt update && \
     ninja-build \
     valgrind \
     linux-perf \
+    liburing-dev \
     # To open in a browser on the host
     xdg-utils \
     && apt clean && \
