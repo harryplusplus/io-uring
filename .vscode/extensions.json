@@ -7,6 +7,9 @@
     "rust-lang.rust-analyzer",
     "tamasfe.even-better-toml",
     "vadimcn.vscode-lldb",
-    "eamodio.gitlens"
+    "eamodio.gitlens",
+    "llvm-vs-code-extensions.vscode-clangd",
+    "ms-vscode.cpptools",
+    "ms-vscode.cmake-tools"
   ]
 }

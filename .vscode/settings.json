@@ -23,5 +23,6 @@
     "files.encoding": "utf8",
     "files.eol": "\n"
   },
+  "C_Cpp.intelliSenseEngine": "disabled",
   "files.associations": {}
 }

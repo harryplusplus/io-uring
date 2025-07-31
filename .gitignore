@@ -1,1 +1,8 @@
-/target
+# CMake
+/build/
+
+# Clangd
+/.cache/
+
+# Rust
+/target/
