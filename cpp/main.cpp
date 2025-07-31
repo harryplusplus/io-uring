@@ -1,10 +1,11 @@
-#include <asm-generic/errno-base.h>
+#include "epoll.h"
+#include <exception>
 #include <functional>
 #include <iostream>
 #include <liburing.h>
 #include <optional>
 #include <string.h>
-#include <sys/epoll.h>
+#include <system_error>
 
 class Defer {
 public:
@@ -28,7 +29,19 @@ private:
 };
 
 int main() {
-  epoll_create1(0);
+  auto epoll = Epoll::create1(0);
+  if (!epoll) {
+    auto &e = epoll.error();
+    if (auto *err = dynamic_cast<std::system_error *>(e.get())) {
+      std::cerr << "System error code: " << err->code().value() << '\n';
+      std::cerr << "Category: " << err->code().category().name() << '\n';
+      std::cerr << "Message: " << err->what() << '\n';
+    } else {
+      std::cerr << "Error: " << e->what() << '\n';
+    }
+    return 1;
+  }
+
   struct io_uring ring {};
   constexpr size_t entries = 8;
   if (int ret = io_uring_queue_init(entries, &ring, IORING_SETUP_SQPOLL);
