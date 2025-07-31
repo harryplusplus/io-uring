@@ -3,7 +3,7 @@
 set -ex
 
 cat /etc/os-release
-uname -a
+uname -r
 
 gcc --version
 g++ --version
