@@ -30,5 +30,7 @@
     "files.eol": "\n"
   },
   "C_Cpp.intelliSenseEngine": "disabled",
-  "files.associations": {}
+  "files.associations": {
+    "cpp/**/*.h": "cpp"
+  }
 }
