@@ -1,14 +1,14 @@
 #pragma once
 
-#include "result.h"
+#include "expected.h"
 
 class Epoll {
 public:
   ~Epoll() noexcept;
 
-  [[nodiscard]] auto close() noexcept -> Result<void>;
+  [[nodiscard]] auto close() noexcept -> Expected<void>;
 
-  [[nodiscard]] static auto create1(int flags) noexcept -> Result<Epoll>;
+  [[nodiscard]] static auto create1(int flags) noexcept -> Expected<Epoll>;
 
 private:
   explicit Epoll(int fd) noexcept;

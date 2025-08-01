@@ -1,4 +1,5 @@
 #include "epoll.h"
+#include "io_uring.h"
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -28,29 +29,31 @@ private:
   std::function<void()> fn_;
 };
 
+auto print_error(const std::unique_ptr<std::exception> &error) -> void {
+  if (auto e = dynamic_cast<std::system_error *>(error.get())) {
+    std::cerr << "code: " << e->code().value()
+              << ", message: " << e->code().message()
+              << ", category: " << e->code().category().name()
+              << ", what: " << e->what() << std::endl;
+  } else {
+    std::cerr << "what: " << e->what() << std::endl;
+  }
+}
+
 int main() {
   auto epoll = Epoll::create1(0);
   if (!epoll) {
-    auto &e = epoll.error();
-    if (auto *err = dynamic_cast<std::system_error *>(e.get())) {
-      std::cerr << "System error code: " << err->code().value() << '\n';
-      std::cerr << "Category: " << err->code().category().name() << '\n';
-      std::cerr << "Message: " << err->what() << '\n';
-    } else {
-      std::cerr << "Error: " << e->what() << '\n';
-    }
+    print_error(epoll.error());
     return 1;
   }
 
   struct io_uring ring {};
   constexpr size_t entries = 8;
-  if (int ret = io_uring_queue_init(entries, &ring, IORING_SETUP_SQPOLL);
-      ret < 0) {
-    std::cerr << "Failed io_uring_queue_init. code: " << ret << ", "
-              << strerror(-ret) << std::endl;
+  auto io_uring = IoUring::queue_init(8, IORING_SETUP_SQPOLL);
+  if (!io_uring) {
+    print_error(io_uring.error());
     return 1;
   }
-  const Defer queue_exit{[&ring]() { io_uring_queue_exit(&ring); }};
 
   const int fd = open("test.txt", O_RDWR | O_CREAT, 0600);
   if (fd < 0) {

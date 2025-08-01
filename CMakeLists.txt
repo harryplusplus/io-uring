@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(work cpp/main.cpp cpp/epoll.cpp)
+add_executable(work cpp/main.cpp cpp/epoll.cpp cpp/expected.cpp cpp/io_uring.cpp)
 target_compile_options(work PRIVATE -fno-exceptions)
 target_include_directories(work PRIVATE third_party/expected/include)
 target_link_libraries(work PRIVATE -luring)

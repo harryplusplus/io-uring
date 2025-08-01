@@ -8,7 +8,7 @@
 
 Epoll::~Epoll() noexcept { [[maybe_unused]] auto res = close(); }
 
-auto Epoll::close() noexcept -> Result<void> {
+auto Epoll::close() noexcept -> Expected<void> {
   if (fd_ == invalid_fd)
     return {};
 
@@ -17,19 +17,17 @@ auto Epoll::close() noexcept -> Result<void> {
 
   const int ret = ::close(fd);
   if (ret == -1)
-    return Err(
-        std::system_error{std::error_code{errno, std::generic_category()},
-                          "Failed to close epoll fd."});
+    return unexpected(
+        std::system_error{make_error_code(errno), "Failed to close epoll fd."});
 
   return {};
 }
 
-auto Epoll::create1(int flags) noexcept -> Result<Epoll> {
+auto Epoll::create1(int flags) noexcept -> Expected<Epoll> {
   const int fd = epoll_create1(flags);
   if (fd == -1)
-    return Err(
-        std::system_error{std::error_code{errno, std::generic_category()},
-                          "Failed to epoll_create1."});
+    return unexpected(std::system_error{make_error_code(errno),
+                                        "Failed to call epoll_create1."});
 
   return Epoll{fd};
 }
