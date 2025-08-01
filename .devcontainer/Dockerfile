@@ -19,6 +19,7 @@ RUN apt update && \
     valgrind \
     linux-perf \
     liburing-dev \
+    libfmt-dev \
     # To open in a browser on the host
     xdg-utils \
     && apt clean && \

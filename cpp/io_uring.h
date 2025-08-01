@@ -1,8 +1,8 @@
 #pragma once
 
-#include "expected.h"
 #include <liburing.h>
 
+#include "result.h"
 class IoUring {
 public:
   ~IoUring() noexcept;
@@ -10,10 +10,10 @@ public:
   auto queue_exit() noexcept -> void;
 
   [[nodiscard]] static auto queue_init(size_t entries, size_t flags) noexcept
-      -> Expected<IoUring>;
+      -> Result<IoUring>;
 
 private:
-  explicit IoUring(struct io_uring ring) noexcept;
+  IoUring(struct io_uring ring) noexcept;
 
   static constexpr int invalid_fd = -1;
   struct io_uring ring_ {

@@ -10,13 +10,14 @@
 
 class Defer {
 public:
-  explicit Defer(std::function<void()> &&fn) noexcept : fn_(std::move(fn)) {}
+  explicit Defer(std::function<void()>&& fn) noexcept : fn_(std::move(fn)) {
+  }
 
-  Defer(const Defer &) = delete;
-  Defer(Defer &&) = delete;
+  Defer(const Defer&) = delete;
+  Defer(Defer&&) = delete;
 
-  Defer &operator=(const Defer &) = delete;
-  Defer &operator=(Defer &&) = delete;
+  Defer& operator=(const Defer&) = delete;
+  Defer& operator=(Defer&&) = delete;
 
   ~Defer() noexcept {
     if (fn_) {
@@ -29,15 +30,11 @@ private:
   std::function<void()> fn_;
 };
 
-auto print_error(const std::unique_ptr<std::exception> &error) -> void {
-  if (auto e = dynamic_cast<std::system_error *>(error.get())) {
-    std::cerr << "code: " << e->code().value()
-              << ", message: " << e->code().message()
-              << ", category: " << e->code().category().name()
-              << ", what: " << e->what() << std::endl;
-  } else {
-    std::cerr << "what: " << e->what() << std::endl;
-  }
+auto print_error(const Error& e) -> void {
+  std::cerr << "code: " << e.code().value()
+            << ", message: " << e.code().message()
+            << ", category: " << e.code().category().name()
+            << ", what: " << e.what() << std::endl;
 }
 
 int main() {
@@ -66,11 +63,11 @@ int main() {
 
     const std::string msg{"Hello liburing"};
     const struct iovec iov = {
-        .iov_base = const_cast<char *>(msg.c_str()),
+        .iov_base = const_cast<char*>(msg.c_str()),
         .iov_len = msg.size(),
     };
 
-    struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+    struct io_uring_sqe* sqe = io_uring_get_sqe(&ring);
     io_uring_prep_writev(sqe, fd, &iov, 1, 0);
     if (int ret = io_uring_submit(&ring); ret < 0) {
       std::cerr << "Failed io_uring_submit. code: " << ret << ", "
@@ -80,7 +77,7 @@ int main() {
   }
 
   {
-    struct io_uring_cqe *cqe{};
+    struct io_uring_cqe* cqe{};
     if (int ret = io_uring_wait_cqe(&ring, &cqe); ret < 0) {
       std::cerr << "Failed io_uring_wait_cqe. code: " << ret << ", "
                 << strerror(-ret) << std::endl;
@@ -101,7 +98,7 @@ int main() {
       .iov_base = buffer,
       .iov_len = sizeof(buffer) - 1,
   };
-  struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring);
   io_uring_prep_readv(sqe, fd, &iov, 1, 0);
   if (int ret = io_uring_submit(&ring); ret < 0) {
     std::cerr << "Failed io_uring_submit. code: " << ret << ", "
@@ -110,7 +107,7 @@ int main() {
   }
 
   {
-    struct io_uring_cqe *cqe{};
+    struct io_uring_cqe* cqe{};
     if (int ret = io_uring_wait_cqe(&ring, &cqe); ret < 0) {
       std::cerr << "Failed io_uring_wait_cqe. code: " << ret << ", "
                 << strerror(-ret) << std::endl;
@@ -129,7 +126,7 @@ int main() {
   std::cout << buffer << std::endl;
 
   constexpr size_t cqe_count = 8;
-  std::array<struct io_uring_cqe *, cqe_count> cqes{};
+  std::array<struct io_uring_cqe*, cqe_count> cqes{};
   if (int ret = io_uring_peek_batch_cqe(&ring, cqes.data(), cqes.size());
       ret < 0) {
     const int errnum = -ret;

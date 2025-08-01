@@ -22,6 +22,7 @@ ninja --version
 valgrind --version
 perf --version
 /sbin/ldconfig -p | grep liburing
+/sbin/ldconfig -p | grep libfmt
 
 rustc --version
 cargo --version

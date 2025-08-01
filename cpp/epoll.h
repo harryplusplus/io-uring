@@ -1,18 +1,23 @@
 #pragma once
 
-#include "expected.h"
+#include "fd.h"
+#include "result.h"
 
 class Epoll {
 public:
+  Epoll(const Epoll&) = delete;
+  Epoll(Epoll&&) noexcept = default;
   ~Epoll() noexcept;
 
-  [[nodiscard]] auto close() noexcept -> Expected<void>;
+  auto operator=(const Epoll&) -> Epoll& = delete;
+  auto operator=(Epoll&&) noexcept -> Epoll& = default;
 
-  [[nodiscard]] static auto create1(int flags) noexcept -> Expected<Epoll>;
+  [[nodiscard]] auto close() noexcept -> Result<void>;
+
+  [[nodiscard]] static auto create1(int flags) noexcept -> Result<Epoll>;
 
 private:
-  explicit Epoll(int fd) noexcept;
+  Epoll(Fd&& fd) noexcept;
 
-  static constexpr int invalid_fd = -1;
-  int fd_{invalid_fd};
+  Fd fd_;
 };
