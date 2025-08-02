@@ -5,12 +5,9 @@
 
 using Error = std::system_error;
 
-template <typename T> using Result = tl::expected<T, Error>;
+template <typename T>
+using Result = tl::expected<T, Error>;
 
-template <typename T> auto ok(T&& v) noexcept {
-  return Result<T>(std::move(v));
+inline auto err(Error&& e) noexcept -> tl::unexpected<Error> {
+  return tl::unexpected{std::move(e)};
 }
-
-auto err(Error&& e) noexcept -> tl::unexpected<Error>;
-
-auto make_generic_error_code(int errnum) noexcept -> std::error_code;
