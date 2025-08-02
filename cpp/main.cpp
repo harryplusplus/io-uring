@@ -185,6 +185,10 @@ run() {
     } else {
       for (int i = 0; i < ret; i++) {
         const auto& event = events[i];
+        if (event.data.fd == event_fd) {
+
+        } else {
+        }
       }
     }
   }
