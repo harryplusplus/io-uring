@@ -3,29 +3,33 @@
 #include <fmt/format.h>
 #include <string>
 
-constexpr auto errnum_to_name(int errnum) noexcept -> std::string_view {
+constexpr std::string_view
+errnum_to_name(int errnum) noexcept {
   const char* name = strerrorname_np(errnum);
   return name ? name : "";
 };
 
-constexpr auto errnum_to_desc(int errnum) noexcept -> std::string_view {
+constexpr std::string_view
+errnum_to_desc(int errnum) noexcept {
   const char* desc = strerrordesc_np(errnum);
   return desc ? desc : "";
 }
 
 enum class ErrorCategory : int {
-  errnum = 0,
+  undefined = 0,
+  errnum,
   kero,
 };
 
-constexpr auto to_string(ErrorCategory category) noexcept -> std::string_view {
+constexpr std::string_view
+to_string(ErrorCategory category) noexcept {
   switch (category) {
+  case ErrorCategory::undefined:
+    return "undefined";
   case ErrorCategory::errnum:
     return "errnum";
   case ErrorCategory::kero:
     return "kero";
-  default:
-    return "unknown";
   }
 }
 
@@ -34,44 +38,59 @@ enum class KeroErrorCode : int {
   invalid_io_uring,
 };
 
-constexpr auto to_name(KeroErrorCode code) noexcept -> std::string_view {
+constexpr std::string_view
+to_name(KeroErrorCode code) noexcept {
   switch (code) {
   case KeroErrorCode::invalid_fd:
     return "invalid_fd";
   case KeroErrorCode::invalid_io_uring:
     return "invalid_io_uring";
-  default:
-    return "unknown";
   }
 }
 
 class Error {
 public:
+  Error() noexcept = default;
   Error(const Error&) = delete;
-  Error(Error&&) = default;
+  Error(Error&&) noexcept = default;
 
   ~Error() noexcept = default;
 
-  auto operator=(const Error&) -> Error& = delete;
-  auto operator=(Error&&) noexcept -> Error& = default;
+  Error& operator=(const Error&) = delete;
+  Error& operator=(Error&&) noexcept = default;
 
-  constexpr auto category() const noexcept -> ErrorCategory {
+  constexpr explicit operator bool() const noexcept {
+    return has_value();
+  }
+
+  constexpr bool
+  has_value() const noexcept {
+    return category_ != ErrorCategory::undefined;
+  }
+
+  constexpr ErrorCategory
+  category() const noexcept {
     return category_;
   }
 
-  constexpr auto code() const noexcept -> int {
+  constexpr int
+  code() const noexcept {
     return code_;
   }
 
-  constexpr auto message() const noexcept -> std::string_view {
+  constexpr std::string_view
+  message() const noexcept {
     return message_;
   }
 
-  constexpr auto to_string() const noexcept -> std::string {
+  constexpr std::string
+  to_string() const noexcept {
     std::string ret{fmt::format("Error{{category:{},code:{},",
                                 ::to_string(category_), code_)};
 
     switch (category_) {
+    case ErrorCategory::undefined:
+      break;
     case ErrorCategory::errnum: {
       std::string_view name = errnum_to_name(code_);
       if (!name.empty())
@@ -90,13 +109,13 @@ public:
     return ret;
   }
 
-  static constexpr auto errnum(int errnum, std::string message) noexcept
-      -> Error {
+  static constexpr Error
+  errnum(int errnum, std::string message) noexcept {
     return Error{ErrorCategory::errnum, errnum, std::move(message)};
   }
 
-  static constexpr auto kero(KeroErrorCode code, std::string message) noexcept
-      -> Error {
+  static constexpr Error
+  kero(KeroErrorCode code, std::string message) noexcept {
     return Error{ErrorCategory::kero, static_cast<int>(code),
                  std::move(message)};
   }
@@ -107,15 +126,15 @@ private:
       : category_{category}, code_{code}, message_{std::move(message)} {
   }
 
-  ErrorCategory category_{ErrorCategory::errnum};
+  ErrorCategory category_{ErrorCategory::undefined};
   int code_{};
   std::string message_;
 };
 
 template <>
 struct fmt::formatter<Error> : formatter<string_view> {
-  constexpr auto format(const Error& val, format_context& ctx)
-      -> format_context::iterator {
+  constexpr format_context::iterator
+  format(const Error& val, format_context& ctx) {
     return formatter<string_view>::format(val.to_string(), ctx);
   }
 };

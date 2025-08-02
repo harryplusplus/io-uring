@@ -2,77 +2,154 @@
 #include <liburing.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <tuple>
 
-#include "fd.h"
+#include "closer.h"
+#include "error.h"
 
-auto run() -> Result<void> {
-  Fd epoll_fd;
-  {
-    const int flags = 0;
-    const int ret = epoll_create1(flags);
-    if (ret == -1)
-      return err(Error::errnum(
-          errno, fmt::format("epoll_create1 failed. flags: {}", flags)));
+using RawFd = int;
 
-    auto fd = Fd::from_raw_fd(ret);
-    if (!fd)
-      return err(std::move(fd.error()));
+void
+print_error(Error err) noexcept {
+  if (err)
+    fmt::print(stderr, "Error occurred. error: {}", err);
+}
 
-    epoll_fd = std::move(*fd);
-  }
+[[nodiscard]] Error
+close_fd(RawFd fd, std::string&& context) noexcept {
+  if (fd < 0)
+    return {};
 
-  Fd event_fd;
-  {
-    const unsigned int count = 0;
-    const int flags = EFD_NONBLOCK;
-    const int ret = eventfd(count, flags);
-    if (ret == -1)
-      return err(Error::errnum(
-          errno,
-          fmt::format("eventfd failed. count: {}, flags: {}", count, flags)));
-
-    auto fd = Fd::from_raw_fd(ret);
-    if (!fd)
-      return err(std::move(fd.error()));
-
-    event_fd = std::move(*fd);
-  }
-
-  auto io_uring = IoUring::queue_init(0, IORING_SETUP_SQPOLL);
-  if (!io_uring)
-    return err(std::move(io_uring.error()));
-
-  io_uring_register_eventfd_async(&io_uring->as_raw_ring(),
-                                  event_fd.as_raw_fd());
+  const int ret = ::close(fd);
+  if (ret == -1)
+    return Error::errnum(
+        errno, fmt::format("close failed. fd: {}, context: {}", fd, context));
 
   return {};
 }
 
-auto main() -> int {
-  if (auto res = run(); !res) {
-    fmt::print(stderr, "{}", res.error());
+std::tuple<RawFd, Closer, Error>
+create_epoll_fd() noexcept {
+  const int flags = 0;
+  const int ret = epoll_create1(flags);
+  if (ret == -1)
+    return {RawFd{}, Closer{},
+            Error::errnum(
+                errno, fmt::format("epoll_create1 failed. flags: {}", flags))};
+
+  return {ret, Closer{[ret]() {
+            print_error(close_fd(ret, "Returned from epoll_create1."));
+          }},
+          Error{}};
+}
+
+std::tuple<RawFd, Closer, Error>
+create_event_fd() noexcept {
+  const unsigned int count = 0;
+  const int flags = EFD_NONBLOCK;
+  const int ret = eventfd(count, flags);
+  if (ret == -1)
+    return {
+        RawFd{}, Closer{},
+        Error::errnum(errno, fmt::format("eventfd failed. count: {}, flags: {}",
+                                         count, flags))};
+
+  return {ret, Closer{[ret]() {
+            print_error(close_fd(ret, "Returned from eventfd."));
+          }},
+          Error{}};
+}
+
+std::tuple<std::shared_ptr<struct io_uring>, Closer, Error>
+create_ring() noexcept {
+  const uint entries = 8;
+  const uint flags = IORING_SETUP_SQPOLL;
+  struct io_uring raw_ring {};
+  const int ret = io_uring_queue_init(entries, &raw_ring, flags);
+  if (ret < 0)
+    return {std::make_shared<struct io_uring>(), Closer{},
+            Error::errnum(
+                -ret, fmt::format(
+                          "io_uring_queue_init failed. entries: {}, flags: {}",
+                          entries, flags))};
+
+  auto ring = std::make_shared<struct io_uring>(raw_ring);
+  return {ring, Closer{[ring]() { io_uring_queue_exit(ring.get()); }}, Error{}};
+}
+
+[[nodiscard]] Error
+unregister_event_fd(std::shared_ptr<struct io_uring> ring) noexcept {
+  const int ret = io_uring_unregister_eventfd(ring.get());
+  if (ret < 0)
+    return Error::errnum(-ret,
+                         fmt::format("io_uring_unregister_eventfd failed."));
+
+  return {};
+}
+
+std::tuple<Closer, Error>
+register_event_fd(std::shared_ptr<struct io_uring> ring,
+                  RawFd event_fd) noexcept {
+  const int ret = io_uring_register_eventfd_async(ring.get(), event_fd);
+  if (ret < 0)
+    return {
+        Closer{},
+        Error::errnum(
+            -ret,
+            fmt::format("io_uring_register_eventfd_async failed. event_fd: {}",
+                        event_fd))};
+
+  return {Closer{[ring]() { print_error(unregister_event_fd(ring)); }},
+          Error{}};
+}
+
+Error
+run() {
+  auto [epoll_fd, epoll_fd_closer, err] = create_epoll_fd();
+  if (err)
+    return std::move(err);
+
+  RawFd event_fd{};
+  Closer event_fd_closer;
+  std::tie(event_fd, event_fd_closer, err) = create_event_fd();
+  if (err)
+    return std::move(err);
+
+  std::shared_ptr<struct io_uring> ring;
+  Closer ring_closer;
+  std::tie(ring, ring_closer, err) = create_ring();
+  if (err)
+    return std::move(err);
+
+  Closer event_fd_unregister;
+  std::tie(event_fd_unregister, err) = register_event_fd(ring, event_fd);
+  if (err)
+    return std::move(err);
+
+  return {};
+}
+
+int
+main() {
+  if (auto err = run(); err) {
+    fmt::print(stderr, "Run failed. error: {}\n", err);
     return 1;
   }
 
-  if (auto res = io_uring->register_eventfd_async(*event_fd); !res) {
-    print_error(res.error());
-    return 1;
-  }
+  // struct epoll_event ev {
+  //   .events = EPOLLIN
+  // };
+  // ev.data.fd = event_fd->as_fd().as_raw_fd();
+  // if (auto res = epoll->ctl(EPOLL_CTL_ADD, event_fd->as_fd(), ev); !res) {
+  //   print_error(res.error());
+  //   return 1;
+  // }
 
-  struct epoll_event ev {
-    .events = EPOLLIN
-  };
-  ev.data.fd = event_fd->as_fd().as_raw_fd();
-  if (auto res = epoll->ctl(EPOLL_CTL_ADD, event_fd->as_fd(), ev); !res) {
-    print_error(res.error());
-    return 1;
-  }
-
-  auto fd = Fd::open("test.txt", O_RDWR | O_CREAT, 0600);
-  if (!fd) {
-    print_error(fd.error());
-    return 1;
-  }
+  // auto fd = Fd::open("test.txt", O_RDWR | O_CREAT, 0600);
+  // if (!fd) {
+  //   print_error(fd.error());
+  //   return 1;
+  // }
 
   // {
 
