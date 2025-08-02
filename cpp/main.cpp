@@ -138,6 +138,8 @@ register_event_fd_to_epoll(RawFd epoll_fd, RawFd event_fd) noexcept {
 
 Error
 run() {
+  SignalHandler::init();
+
   auto [epoll_fd, epoll_fd_closer, err] = create_epoll_fd();
   if (err)
     return std::move(err);
@@ -166,13 +168,32 @@ run() {
   if (err)
     return std::move(err);
 
+  std::array<struct epoll_event, 8> events;
+  while (!SignalHandler::is_shutdown_signaled()) {
+    const int ret = epoll_wait(epoll_fd, events.data(), events.size(), -1);
+    if (ret == -1) {
+      const int errnum = errno;
+      if (errnum == EINTR) {
+        if (SignalHandler::is_shutdown_signaled())
+          return {};
+        else
+          continue;
+      } else {
+        return Error::errnum(
+            errnum, fmt::format("epoll_wait failed. epoll_fd: {}", epoll_fd));
+      }
+    } else {
+      for (int i = 0; i < ret; i++) {
+        const auto& event = events[i];
+      }
+    }
+  }
+
   return {};
 }
 
 int
 main() {
-  SignalHandler::init();
-
   if (auto err = run(); err) {
     fmt::print(stderr, "Run failed. error: {}\n", err);
     return 1;

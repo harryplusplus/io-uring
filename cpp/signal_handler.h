@@ -7,6 +7,11 @@ class SignalHandler {
 public:
   static void init() noexcept;
 
+  static inline bool
+  is_shutdown_signaled() noexcept {
+    return shutdown_flag != 0;
+  }
+
 private:
   static void on_signal(int signal) noexcept;
 
