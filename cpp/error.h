@@ -1,19 +1,9 @@
 #pragma once
 
+#include <fmt/core.h>
 #include <fmt/format.h>
 #include <string>
-
-constexpr std::string_view
-errnum_to_name(int errnum) noexcept {
-  const char* name = strerrorname_np(errnum);
-  return name ? name : "";
-};
-
-constexpr std::string_view
-errnum_to_desc(int errnum) noexcept {
-  const char* desc = strerrordesc_np(errnum);
-  return desc ? desc : "";
-}
+#include <vector>
 
 enum class ErrorCategory : int {
   undefined = 0,
@@ -33,24 +23,80 @@ to_string(ErrorCategory category) noexcept {
   }
 }
 
+constexpr std::string_view
+errnum_to_name(int errnum) noexcept {
+  const char* name = strerrorname_np(errnum);
+  return name ? name : "";
+};
+
+constexpr std::string_view
+errnum_to_desc(int errnum) noexcept {
+  const char* desc = strerrordesc_np(errnum);
+  return desc ? desc : "";
+}
+
+class ErrnumError {
+public:
+  constexpr ErrnumError(int code, std::string message) noexcept
+      : code{code}, message{std::move(message)} {
+  }
+
+  ErrnumError(const ErrnumError&) = delete;
+  ErrnumError(ErrnumError&&) noexcept = default;
+
+  ~ErrnumError() noexcept = default;
+
+  ErrnumError& operator=(const ErrnumError&) = delete;
+  ErrnumError& operator=(ErrnumError&&) noexcept = default;
+
+  int code;
+  std::string message;
+};
+
 enum class KeroErrorCode : int {
-  invalid_fd = 1000,
-  invalid_io_uring,
+  unexpected_error = 1000,
 };
 
 constexpr std::string_view
 to_name(KeroErrorCode code) noexcept {
   switch (code) {
-  case KeroErrorCode::invalid_fd:
-    return "invalid_fd";
-  case KeroErrorCode::invalid_io_uring:
-    return "invalid_io_uring";
+  case KeroErrorCode::unexpected_error:
+    return "unexpected_error";
   }
 }
+
+class KeroError {
+public:
+  constexpr KeroError(KeroErrorCode code, std::string message) noexcept
+      : code{code}, message{std::move(message)} {
+  }
+
+  KeroError(const KeroError&) = delete;
+  KeroError(KeroError&&) noexcept = default;
+
+  ~KeroError() noexcept = default;
+
+  KeroError& operator=(const KeroError&) = delete;
+  KeroError& operator=(KeroError&&) noexcept = default;
+
+  KeroErrorCode code;
+  std::string message;
+};
 
 class Error {
 public:
   Error() noexcept = default;
+
+  constexpr Error(ErrnumError&& err) noexcept
+      : category_{ErrorCategory::errnum}, code_{err.code}, message_{std::move(
+                                                               err.message)} {
+  }
+
+  constexpr Error(KeroError&& err) noexcept
+      : category_{ErrorCategory::kero}, code_{static_cast<int>(err.code)},
+        message_{std::move(err.message)} {
+  }
+
   Error(const Error&) = delete;
   Error(Error&&) noexcept = default;
 
@@ -85,8 +131,12 @@ public:
 
   constexpr std::string
   to_string() const noexcept {
-    std::string ret{fmt::format("Error{{category:{},code:{},",
-                                ::to_string(category_), code_)};
+    using Attr = std::pair<std::string_view, std::string>;
+
+    std::vector<Attr> attrs{
+        Attr{"category", ::to_string(category_)},
+        Attr{"code", std::to_string(code_)},
+    };
 
     switch (category_) {
     case ErrorCategory::undefined:
@@ -94,38 +144,33 @@ public:
     case ErrorCategory::errnum: {
       std::string_view name = errnum_to_name(code_);
       if (!name.empty())
-        ret += fmt::format("name:{},", name);
+        attrs.push_back(Attr{"name", name});
+
       std::string_view desc = errnum_to_desc(code_);
       if (!desc.empty())
-        ret += fmt::format("desc:{},", desc);
+        attrs.push_back(Attr{"desc", desc});
     } break;
     case ErrorCategory::kero: {
-      ret +=
-          fmt::format("name:{},", to_name(static_cast<KeroErrorCode>(code_)));
+      attrs.push_back(Attr{"name", to_name(static_cast<KeroErrorCode>(code_))});
     } break;
     }
 
-    ret += fmt::format("message:{}}}", message_);
+    if (!message_.empty())
+      attrs.push_back(Attr{"message", message_});
+
+    std::string ret{"Error{"};
+    for (auto it = attrs.begin(); it != attrs.end(); it++) {
+      auto [key, val] = *it;
+      ret += fmt::format("{}:{}", key, val);
+      if (std::next(it) != attrs.end())
+        ret += ",";
+    }
+
+    ret += "}";
     return ret;
   }
 
-  static constexpr Error
-  errnum(int errnum, std::string message) noexcept {
-    return Error{ErrorCategory::errnum, errnum, std::move(message)};
-  }
-
-  static constexpr Error
-  kero(KeroErrorCode code, std::string message) noexcept {
-    return Error{ErrorCategory::kero, static_cast<int>(code),
-                 std::move(message)};
-  }
-
 private:
-  constexpr Error(ErrorCategory category, int code,
-                  std::string message) noexcept
-      : category_{category}, code_{code}, message_{std::move(message)} {
-  }
-
   ErrorCategory category_{ErrorCategory::undefined};
   int code_{};
   std::string message_;

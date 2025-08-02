@@ -23,8 +23,8 @@ close_fd(RawFd fd, std::string&& context) noexcept {
 
   const int ret = ::close(fd);
   if (ret == -1)
-    return Error::errnum(
-        errno, fmt::format("close failed. fd: {}, context: {}", fd, context));
+    return {
+        {errno, fmt::format("close failed. fd: {}, context: {}", fd, context)}};
 
   return {};
 }
@@ -34,9 +34,9 @@ create_epoll_fd() noexcept {
   const int flags = 0;
   const int ret = epoll_create1(flags);
   if (ret == -1)
-    return {RawFd{}, Closer{},
-            Error::errnum(
-                errno, fmt::format("epoll_create1 failed. flags: {}", flags))};
+    return {
+        RawFd{}, Closer{},
+        Error{{errno, fmt::format("epoll_create1 failed. flags: {}", flags)}}};
 
   return {ret, Closer{[ret]() noexcept {
             print_error(close_fd(ret, "Returned from epoll_create1."));
@@ -50,10 +50,9 @@ create_event_fd() noexcept {
   const int flags = EFD_NONBLOCK;
   const int ret = eventfd(count, flags);
   if (ret == -1)
-    return {
-        RawFd{}, Closer{},
-        Error::errnum(errno, fmt::format("eventfd failed. count: {}, flags: {}",
-                                         count, flags))};
+    return {RawFd{}, Closer{},
+            Error{{errno, fmt::format("eventfd failed. count: {}, flags: {}",
+                                      count, flags)}}};
 
   return {ret, Closer{[ret]() noexcept {
             print_error(close_fd(ret, "Returned from eventfd."));
@@ -68,11 +67,11 @@ create_ring() noexcept {
   struct io_uring raw_ring {};
   const int ret = io_uring_queue_init(entries, &raw_ring, flags);
   if (ret < 0)
-    return {std::make_shared<struct io_uring>(), Closer{},
-            Error::errnum(
-                -ret, fmt::format(
-                          "io_uring_queue_init failed. entries: {}, flags: {}",
-                          entries, flags))};
+    return {
+        std::make_shared<struct io_uring>(), Closer{},
+        Error{{-ret,
+               fmt::format("io_uring_queue_init failed. entries: {}, flags: {}",
+                           entries, flags)}}};
 
   auto ring = std::make_shared<struct io_uring>(raw_ring);
   return {ring, Closer{[ring]() noexcept { io_uring_queue_exit(ring.get()); }},
@@ -83,8 +82,7 @@ create_ring() noexcept {
 unregister_event_fd_from_ring(std::shared_ptr<struct io_uring> ring) noexcept {
   const int ret = io_uring_unregister_eventfd(ring.get());
   if (ret < 0)
-    return Error::errnum(-ret,
-                         fmt::format("io_uring_unregister_eventfd failed."));
+    return {{-ret, fmt::format("io_uring_unregister_eventfd failed.")}};
 
   return {};
 }
@@ -96,10 +94,9 @@ register_event_fd_to_ring(std::shared_ptr<struct io_uring> ring,
   if (ret < 0)
     return {
         Closer{},
-        Error::errnum(
-            -ret,
-            fmt::format("io_uring_register_eventfd_async failed. event_fd: {}",
-                        event_fd))};
+        Error{{-ret, fmt::format(
+                         "io_uring_register_eventfd_async failed. event_fd: {}",
+                         event_fd)}}};
 
   return {Closer{[ring]() noexcept {
             print_error(unregister_event_fd_from_ring(ring));
@@ -111,7 +108,9 @@ register_event_fd_to_ring(std::shared_ptr<struct io_uring> ring,
 unregister_event_fd_from_epoll(RawFd epoll_fd, RawFd event_fd) noexcept {
   const int ret = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, event_fd, nullptr);
   if (ret == -1)
-    return Error::errnum(errno, fmt::format(""));
+    return {{errno, fmt::format("unregister_event_fd_from_epoll failed. "
+                                "epoll_fd: {}, event_fd: {}",
+                                epoll_fd, event_fd)}};
 
   return {};
 }
@@ -124,11 +123,9 @@ register_event_fd_to_epoll(RawFd epoll_fd, RawFd event_fd) noexcept {
   const int ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev);
   if (ret == -1)
     return {Closer{},
-            Error::errnum(
-                errno,
-                fmt::format(
-                    "add_event_fd_to_epoll failed. epoll_fd: {}, event_fd: {}",
-                    epoll_fd, event_fd))};
+            Error{{errno, fmt::format("register_event_fd_to_epoll failed. "
+                                      "epoll_fd: {}, event_fd: {}",
+                                      epoll_fd, event_fd)}}};
 
   return {Closer{[epoll_fd, event_fd]() noexcept {
             print_error(unregister_event_fd_from_epoll(epoll_fd, event_fd));
@@ -174,37 +171,59 @@ run() {
     if (ret == -1) {
       const int errnum = errno;
       if (errnum == EINTR) {
-        if (SignalHandler::is_shutdown_signaled()) {
-          // graceful shutdown
-          return {};
-        } else
+        if (!SignalHandler::is_shutdown_signaled())
           continue;
-      } else {
-        return Error::errnum(
-            errnum, fmt::format("epoll_wait failed. epoll_fd: {}", epoll_fd));
+
+        // graceful shutdown
+        return {};
       }
-    } else {
-      for (int i = 0; i < ret; i++) {
-        const auto& event = events[i];
-        if (event.data.fd == event_fd) {
-          if (event.events & EPOLLIN) {
-            uint64_t value{};
-            const ssize_t ret = read(event_fd, &value, sizeof(value));
-            if (ret == -1) {
-              const int errnum = errno;
-            } else if (ret == 0) {
-              // EOF error
-            } else if (ret == sizeof(value)) {
-              // ok
-            } else {
-              // unexpected error
-            }
-          } else {
-            // unexpected error
-          }
-        } else {
-          // other events
+
+      return {
+          {errnum, fmt::format("epoll_wait failed. epoll_fd: {}", epoll_fd)}};
+    }
+
+    for (int i = 0; i < ret; i++) {
+      const auto& ev = events[i];
+      if (ev.data.fd == event_fd) {
+        if (ev.events & EPOLLERR) {
+          return {{KeroErrorCode::unexpected_error,
+                   fmt::format("EPOLLERR occurred. event_fd: {}, events: {}",
+                               event_fd, ev.events)}};
         }
+
+        if (ev.events & EPOLLHUP) {
+          return {{KeroErrorCode::unexpected_error,
+                   fmt::format("EPOLLHUP occurred. event_fd: {}, events: {}",
+                               event_fd, ev.events)}};
+        }
+
+        if (ev.events & EPOLLIN) {
+          uint64_t value{};
+          const ssize_t ret = read(event_fd, &value, sizeof(value));
+          if (ret == -1) {
+            return {
+                {errno, fmt::format("read failed. event_fd: {}", event_fd)}};
+          } else if (ret == 0) {
+            return {{KeroErrorCode::unexpected_error,
+                     fmt::format("event fd is EOF. event_fd: {}", event_fd)}};
+          } else if (ret == sizeof(value)) {
+            // ok
+          } else {
+            return {{KeroErrorCode::unexpected_error,
+                     fmt::format("unexpected read return value. event_fd: {}, "
+                                 "return value: {}",
+                                 event_fd, ret)}};
+          }
+        }
+
+        if ((ev.events & ~(EPOLLERR | EPOLLHUP | EPOLLIN)) != 0) {
+          fmt::print(stderr,
+                     "Unhandled event fd event. event_fd: {}, events: {}\n",
+                     event_fd, ev.events);
+        }
+      } else {
+        fmt::print(stderr, "Unhandled epoll event. data(u64): {}, events: {}\n",
+                   ev.data.u64, ev.events);
       }
     }
   }
@@ -250,7 +269,8 @@ main() {
   //     return 1;
   //   }
 
-  //   const Defer cqe_seen{[&ring, &cqe]() { io_uring_cqe_seen(&ring, cqe); }};
+  //   const Defer cqe_seen{[&ring, &cqe]() { io_uring_cqe_seen(&ring, cqe);
+  //   }};
 
   //   if (cqe->res < 0) {
   //     std::cerr << "Failed io_uring_wait_cqe. code: " << cqe->res << ", "
@@ -280,7 +300,8 @@ main() {
   //     return 1;
   //   }
 
-  //   const Defer cqe_seen{[&ring, &cqe]() { io_uring_cqe_seen(&ring, cqe); }};
+  //   const Defer cqe_seen{[&ring, &cqe]() { io_uring_cqe_seen(&ring, cqe);
+  //   }};
 
   //   if (cqe->res < 0) {
   //     std::cerr << "Failed io_uring_wait_cqe. code: " << cqe->res << ", "
