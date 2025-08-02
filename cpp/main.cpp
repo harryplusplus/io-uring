@@ -46,7 +46,7 @@ create_epoll_fd() noexcept {
 
 [[nodiscard]] std::tuple<RawFd, Closer, Error>
 create_event_fd() noexcept {
-  const unsigned int count = 0;
+  const uint count = 0;
   const int flags = EFD_NONBLOCK;
   const int ret = eventfd(count, flags);
   if (ret == -1)
@@ -168,15 +168,16 @@ run() {
   if (err)
     return std::move(err);
 
-  std::array<struct epoll_event, 8> events;
+  std::array<struct epoll_event, 1024> events;
   while (!SignalHandler::is_shutdown_signaled()) {
     const int ret = epoll_wait(epoll_fd, events.data(), events.size(), -1);
     if (ret == -1) {
       const int errnum = errno;
       if (errnum == EINTR) {
-        if (SignalHandler::is_shutdown_signaled())
+        if (SignalHandler::is_shutdown_signaled()) {
+          // graceful shutdown
           return {};
-        else
+        } else
           continue;
       } else {
         return Error::errnum(
@@ -186,7 +187,21 @@ run() {
       for (int i = 0; i < ret; i++) {
         const auto& event = events[i];
         if (event.data.fd == event_fd) {
-
+          if (event.events & EPOLLIN) {
+            uint64_t value{};
+            const ssize_t ret = read(event_fd, &value, sizeof(value));
+            if (ret == -1) {
+              const int errnum = errno;
+            } else if (ret == 0) {
+              // EOF error
+            } else if (ret == sizeof(value)) {
+              // ok
+            } else {
+              // unexpected error
+            }
+          } else {
+            // unexpected error
+          }
         } else {
         }
       }
