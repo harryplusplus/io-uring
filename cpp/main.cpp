@@ -1,31 +1,56 @@
 #include <fmt/format.h>
+#include <liburing.h>
+#include <sys/epoll.h>
 #include <sys/eventfd.h>
 
-#include "epoll.h"
-#include "event_fd.h"
-#include "io_uring.h"
+#include "fd.h"
 
-auto print_error(const Error& e) -> void {
-  fmt::print(stderr, "category: {} code: {} what: {}\n",
-             e.code().category().name(), e.code().value(), e.what());
+auto run() -> Result<void> {
+  Fd epoll_fd;
+  {
+    const int flags = 0;
+    const int ret = epoll_create1(flags);
+    if (ret == -1)
+      return err(Error::errnum(
+          errno, fmt::format("epoll_create1 failed. flags: {}", flags)));
+
+    auto fd = Fd::from_raw_fd(ret);
+    if (!fd)
+      return err(std::move(fd.error()));
+
+    epoll_fd = std::move(*fd);
+  }
+
+  Fd event_fd;
+  {
+    const unsigned int count = 0;
+    const int flags = EFD_NONBLOCK;
+    const int ret = eventfd(count, flags);
+    if (ret == -1)
+      return err(Error::errnum(
+          errno,
+          fmt::format("eventfd failed. count: {}, flags: {}", count, flags)));
+
+    auto fd = Fd::from_raw_fd(ret);
+    if (!fd)
+      return err(std::move(fd.error()));
+
+    event_fd = std::move(*fd);
+  }
+
+  auto io_uring = IoUring::queue_init(0, IORING_SETUP_SQPOLL);
+  if (!io_uring)
+    return err(std::move(io_uring.error()));
+
+  io_uring_register_eventfd_async(&io_uring->as_raw_ring(),
+                                  event_fd.as_raw_fd());
+
+  return {};
 }
 
-int main() {
-  auto epoll = Epoll::create1(0);
-  if (!epoll) {
-    print_error(epoll.error());
-    return 1;
-  }
-
-  auto io_uring = IoUring::queue_init(8, IORING_SETUP_SQPOLL);
-  if (!io_uring) {
-    print_error(io_uring.error());
-    return 1;
-  }
-
-  auto event_fd = EventFd::create(0, EFD_NONBLOCK);
-  if (!event_fd) {
-    print_error(event_fd.error());
+auto main() -> int {
+  if (auto res = run(); !res) {
+    fmt::print(stderr, "{}", res.error());
     return 1;
   }
 
