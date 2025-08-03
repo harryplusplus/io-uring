@@ -2,31 +2,33 @@
 #include <liburing.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <tuple>
 
 #include "closer.h"
 #include "error.h"
+#include "result.h"
 #include "signal_handler.h"
 
 using RawFd = int;
 
 void
-print_error(Error err) noexcept {
-  if (err)
-    fmt::print(stderr, "Error occurred. error: {}", err);
+print_error(Error&& err) noexcept {
+  fmt::print(stderr, "Error occurred. error: {}", err);
 }
 
-[[nodiscard]] Error
+[[nodiscard]] Result<void>
 close_fd(RawFd fd, std::string&& context) noexcept {
   if (fd < 0)
-    return {};
+    return ok();
 
   const int ret = ::close(fd);
   if (ret == -1)
-    return {
-        {errno, fmt::format("close failed. fd: {}, context: {}", fd, context)}};
+    return err(errno)
+        .message("close failed.")
+        .detail("fd", std::to_string(fd))
+        .detail("context", std::move(context))
+        .build();
 
-  return {};
+  return ok();
 }
 
 [[nodiscard]] std::tuple<RawFd, Closer, Error>
