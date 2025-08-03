@@ -32,14 +32,6 @@
   "C_Cpp.copilotHover": "disabled",
   "C_Cpp.intelliSenseEngine": "default",
   "files.associations": {
-    "cpp/**/*.h": "cpp",
-    "unordered_map": "cpp",
-    "system_error": "cpp",
-    "sstream": "cpp",
-    "numeric": "cpp",
-    "istream": "cpp",
-    "ostream": "cpp",
-    "typeinfo": "cpp",
-    "variant": "cpp"
+    "cpp/**/*.h": "cpp"
   }
 }
