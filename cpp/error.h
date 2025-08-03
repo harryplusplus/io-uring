@@ -1,39 +1,55 @@
 #pragma once
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 
-#include "result.h"
+namespace kero {
 
-enum class KeroErrorCode : int {
+enum class Errc : int {
   unexpected_error = 1000,
 };
 
 constexpr bool
-is_kero_error_code(int code) noexcept {
-  return static_cast<int>(KeroErrorCode::unexpected_error) <= code &&
-         code <= static_cast<int>(KeroErrorCode::unexpected_error);
+is_errc(int code) noexcept {
+  return static_cast<int>(Errc::unexpected_error) <= code &&
+         code <= static_cast<int>(Errc::unexpected_error);
 }
 
-constexpr std::string_view
-to_name(KeroErrorCode code) noexcept {
+} // namespace kero
+
+namespace std {
+
+constexpr std::string
+to_string(kero::Errc code) noexcept {
   switch (code) {
-  case KeroErrorCode::unexpected_error:
+  case kero::Errc::unexpected_error:
     return "unexpected_error";
   }
-}
+} // namespace std
+
+template <>
+struct is_error_code_enum<kero::Errc> : true_type {};
+
+} // namespace std
+
+namespace kero {
+
+class Category : public std::error_category {
+public:
+  virtual const char* name() const noexcept override;
+
+  virtual std::string message(int condition) const noexcept override;
+};
+
+const Category& category() noexcept;
 
 class Error {
 public:
-  enum class Category : int {
-    errnum = 0,
-    kero,
-  };
-
   class Builder {
   public:
-    Builder(Category category, int code) noexcept;
+    Builder(std::error_code&& ec) noexcept;
 
     Builder(const Builder&) = delete;
     Builder(Builder&&) = delete;
@@ -44,8 +60,8 @@ public:
     Builder& operator=(Builder&&) = delete;
 
     constexpr Builder&&
-    message(std::string&& message) && noexcept {
-      message_ = std::move(message);
+    reason(std::string&& reason) && noexcept {
+      reason_ = std::move(reason);
       return std::move(*this);
     }
 
@@ -58,9 +74,8 @@ public:
     Error build() && noexcept;
 
   private:
-    Category category_;
-    int code_;
-    std::string message_;
+    std::error_code error_code_;
+    std::string reason_;
     std::unordered_map<std::string, std::string> details_;
 
     friend Error;
@@ -76,51 +91,24 @@ public:
   Error& operator=(const Error&) = delete;
   Error& operator=(Error&&) noexcept = default;
 
-  std::string to_string() const noexcept;
-
-  Category category;
-  int code;
-  std::string message;
-  std::unordered_map<std::string, std::string> details;
+private:
+  std::error_code error_code_;
+  std::string reason_;
+  std::unordered_map<std::string, std::string> details_;
 };
 
-constexpr std::string_view
-to_string(Error::Category category) noexcept {
-  switch (category) {
-  case Error::Category::errnum:
-    return "errnum";
-  case Error::Category::kero:
-    return "kero";
-  }
-}
+} // namespace kero
 
-Error::Builder err(int errnum) noexcept;
-Error::Builder err(KeroErrorCode code) noexcept;
+namespace std {
+
+std::string to_string(const kero::Error& err) noexcept;
+
+} // namespace std
 
 template <>
-struct fmt::formatter<Error> : formatter<string_view> {
+struct fmt::formatter<kero::Error> : formatter<string_view> {
   constexpr format_context::iterator
-  format(const Error& val, format_context& ctx) {
-    return formatter<string_view>::format(val.to_string(), ctx);
+  format(const kero::Error& val, format_context& ctx) {
+    return formatter<string_view>::format(std::to_string(val), ctx);
   }
 };
-
-template <typename T>
-using Result = kero::Result<T, Error>;
-
-template <typename T>
-constexpr Result<T>
-ok(T&& val) noexcept {
-  return kero::ok<T, Error>(std::move(val));
-}
-
-template <typename T>
-constexpr Result<T>
-err(Error&& err) noexcept {
-  return kero::err<T, Error>(std::move(err));
-}
-
-constexpr Result<void>
-ok() noexcept {
-  return kero::ok<Error>();
-}
