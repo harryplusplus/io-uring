@@ -152,29 +152,7 @@ public:
     return details_;
   }
 
-  template <typename T>
-  inline Error&
-  add_detail(std::string&& key, T&& val) & noexcept {
-    add_detail_impl(std::move(key), std::forward<T&&>(val));
-    return *this;
-  }
-
-  template <typename T>
-  inline Error&&
-  add_detail(std::string&& key, T&& val) && noexcept {
-    add_detail_impl(std::move(key), std::forward<T&&>(val));
-    return std::move(*this);
-  }
-
 private:
-  template <typename T>
-  inline void
-  add_detail_impl(std::string&& key, T&& val) noexcept {
-    std::stringstream ss;
-    ss << std::forward<T&&>(val);
-    details_.insert({std::move(key), ss.str()});
-  }
-
   std::error_code error_code_;
   std::string reason_;
   std::unordered_map<std::string, std::string> details_;

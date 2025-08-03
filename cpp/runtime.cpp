@@ -12,18 +12,6 @@ using namespace kero;
 
 using Fd = int;
 
-[[nodiscard]] Result<void, Error>
-close_fd(Fd fd) noexcept {
-  if (fd < 0)
-    return {};
-
-  const int ret = close(fd);
-  if (ret == -1)
-    return err(errno).reason("close failed.").detail("fd", fd).build();
-
-  return {};
-}
-
 Result<void, Error>
 Runtime::run() noexcept {
   int ret = epoll_create1(0);
@@ -32,8 +20,13 @@ Runtime::run() noexcept {
 
   const Fd epoll_fd = ret;
   Closer close_epoll_fd{[epoll_fd]() noexcept {
-    if (auto res = close_fd(epoll_fd); !res)
-      std::cerr << res.error().add_detail("epoll_fd", epoll_fd) << "\n";
+    const int ret = close(epoll_fd);
+    if (ret == -1)
+      std::cerr << err(errno)
+                       .reason("epoll_fd close failed.")
+                       .detail("epoll_fd", epoll_fd)
+                       .build()
+                << "\n";
   }};
 
   ret = eventfd(0, EFD_NONBLOCK);
@@ -42,9 +35,13 @@ Runtime::run() noexcept {
 
   const Fd event_fd = ret;
   Closer close_event_fd{[event_fd]() noexcept {
-    if (auto res = close_fd(event_fd); !res) {
-      std::cerr << res.error().add_detail("event_fd", event_fd) << "\n";
-    }
+    const int ret = close(event_fd);
+    if (ret == -1)
+      std::cerr << err(errno)
+                       .reason("event_fd close failed.")
+                       .detail("event_fd", event_fd)
+                       .build()
+                << "\n";
   }};
 
   struct io_uring ring{};
