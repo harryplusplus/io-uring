@@ -38,12 +38,12 @@ namespace kero {
 
 class Category : public std::error_category {
 public:
-  inline virtual const char*
+  const char*
   name() const noexcept override {
     return "kero";
   }
 
-  [[nodiscard]] inline virtual std::string
+  [[nodiscard]] std::string
   message(int condition) const noexcept override {
     std::stringstream ss;
     if (is_errc(condition)) {
@@ -102,7 +102,7 @@ public:
     }
 
     template <typename T>
-    inline Builder&&
+    Builder&&
     detail(std::string&& key, T&& val) && noexcept {
       std::stringstream ss;
       ss << std::forward<T&&>(val);
