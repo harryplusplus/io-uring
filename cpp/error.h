@@ -164,6 +164,11 @@ err(int errnum) noexcept {
 }
 
 [[nodiscard]] inline Error::Builder
+err(std::errc e) noexcept {
+  return Error::Builder{std::make_error_code(e)};
+}
+
+[[nodiscard]] inline Error::Builder
 err(Errc e) noexcept {
   return Error::Builder{std::make_error_code(e)};
 }
