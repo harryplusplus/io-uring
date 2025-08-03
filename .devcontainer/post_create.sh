@@ -16,6 +16,7 @@ gprof --version
 clang --version
 clang++ --version
 lldb --version
+clangd --version
 
 cmake --version
 ninja --version

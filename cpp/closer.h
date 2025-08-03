@@ -5,20 +5,33 @@
 class Closer {
 public:
   Closer() noexcept = default;
-  Closer(std::function<void()>&& fn) noexcept;
+
+  inline Closer(std::function<void()>&& fn) noexcept : fn_{std::move(fn)} {
+  }
+
   Closer(const Closer&) = delete;
   Closer(Closer&&) noexcept = default;
 
-  ~Closer() noexcept;
+  inline ~Closer() noexcept {
+    close();
+  }
 
   Closer& operator=(const Closer&) = delete;
   Closer& operator=(Closer&&) noexcept = default;
 
-  explicit constexpr operator bool() const noexcept {
+  explicit constexpr
+  operator bool() const noexcept {
     return !is_closed();
   }
 
-  void close() noexcept;
+  inline void
+  close() noexcept {
+    if (!is_closed()) {
+      auto fn = fn_;
+      fn_ = {};
+      fn();
+    }
+  }
 
   constexpr bool
   is_closed() const noexcept {

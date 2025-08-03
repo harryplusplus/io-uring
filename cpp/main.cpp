@@ -15,21 +15,21 @@ using RawFd = int;
 //   fmt::print(stderr, "Error occurred. error: {}", err);
 // }
 
-// [[nodiscard]] Result<void>
-// close_fd(RawFd fd, std::string&& context) noexcept {
-//   if (fd < 0)
-//     return ok();
+[[nodiscard]] kero::Result<void, kero::Error>
+close_fd(RawFd fd, std::string&& context) noexcept {
+  if (fd < 0)
+    return {};
 
-//   const int ret = ::close(fd);
-//   if (ret == -1)
-//     return err(errno)
-//         .message("close failed.")
-//         .detail("fd", std::to_string(fd))
-//         .detail("context", std::move(context))
-//         .build();
+  const int ret = ::close(fd);
+  if (ret == -1)
+    return kero::err(errno)
+        .reason("close failed.")
+        .detail("fd", fd)
+        .detail("context", std::move(context))
+        .build();
 
-//   return ok();
-// }
+  return {};
+}
 
 // [[nodiscard]] std::tuple<RawFd, Closer, Error>
 // create_epoll_fd() noexcept {

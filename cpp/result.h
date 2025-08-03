@@ -57,7 +57,8 @@ public:
     return value();
   }
 
-  constexpr explicit operator bool() const noexcept {
+  constexpr explicit
+  operator bool() const noexcept {
     return is_ok();
   }
 
@@ -128,18 +129,6 @@ private:
   std::variant<T, E> data_;
 };
 
-template <typename T, typename E>
-constexpr Result<T, E>
-ok(typename Result<T, E>::value_type&& val) noexcept {
-  return Result<T, E>{std::move(val)};
-}
-
-template <typename T, typename E>
-constexpr Result<T, E>
-err(typename Result<T, E>::error_type&& err) noexcept {
-  return Result<T, E>{std::move(err)};
-}
-
 template <typename E>
 class Result<void, E> {
 public:
@@ -160,7 +149,8 @@ public:
   Result& operator=(const Result&) = delete;
   Result& operator=(Result&&) noexcept = default;
 
-  constexpr explicit operator bool() const noexcept {
+  constexpr explicit
+  operator bool() const noexcept {
     return is_ok();
   }
 
@@ -201,11 +191,5 @@ public:
 private:
   std::variant<std::monostate, E> data_;
 };
-
-template <typename E>
-constexpr Result<void, E>
-ok() noexcept {
-  return Result<void, E>{};
-}
 
 } // namespace kero
