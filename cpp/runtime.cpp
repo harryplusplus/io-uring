@@ -14,6 +14,8 @@ using Fd = int;
 
 Result<void, Error>
 Runtime::run() noexcept {
+  // add signal handler
+
   int ret = epoll_create1(0);
   if (ret == -1)
     return err(errno).reason("epoll_create1 failed.").build();
@@ -85,6 +87,14 @@ Runtime::run() noexcept {
                        .build()
                 << "\n";
   }};
+
+  std::array<struct epoll_event, 1024> events;
+  while (true) {
+    const int ret = epoll_wait(epoll_fd, events.data(), events.size(), -1);
+    if (ret == -1) {
+      const int errnum = errno;
+    }
+  }
 
   return {};
 }
