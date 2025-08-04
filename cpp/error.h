@@ -1,5 +1,8 @@
-#pragma once
+#ifndef KERO_ERROR_H_
+#define KERO_ERROR_H_
 
+#include <cassert>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -8,46 +11,43 @@
 namespace kero {
 
 enum class Errc : int {
-  unexpected_error = 1000,
-  already_opened,
+  _begin = 1000,
+  unexpected_error,
+  _end,
 };
 
-constexpr bool
-is_errc(int code) noexcept {
-  return static_cast<int>(Errc::unexpected_error) <= code &&
-         code <= static_cast<int>(Errc::unexpected_error);
+constexpr bool is_errc(int code) noexcept {
+  return static_cast<int>(Errc::_begin) <= code &&
+         code <= static_cast<int>(Errc::_end);
 }
 
-} // namespace kero
+}  // namespace kero
 
 namespace std {
 
-constexpr ostream&
-operator<<(ostream& os, kero::Errc val) noexcept {
+constexpr ostream& operator<<(ostream& os, kero::Errc val) noexcept {
   switch (val) {
-  case kero::Errc::unexpected_error:
-    return os << "unexpected_error";
-  case kero::Errc::already_opened:
-    return os << "already_opened";
+    case kero::Errc::_begin:
+      return os << "kero::Errc::_begin";
+    case kero::Errc::unexpected_error:
+      return os << "kero::Errc::unexpected_error";
+    case kero::Errc::_end:
+      return os << "kero::Errc::_end";
   }
 }
 
 template <>
 struct is_error_code_enum<kero::Errc> : true_type {};
 
-} // namespace std
+}  // namespace std
 
 namespace kero {
 
 class Category : public std::error_category {
-public:
-  const char*
-  name() const noexcept override {
-    return "kero";
-  }
+ public:
+  const char* name() const noexcept override { return "kero"; }
 
-  [[nodiscard]] std::string
-  message(int condition) const noexcept override {
+  [[nodiscard]] std::string message(int condition) const noexcept override {
     std::stringstream ss;
     if (is_errc(condition)) {
       ss << static_cast<Errc>(condition);
@@ -56,32 +56,45 @@ public:
     }
     return ss.str();
   }
+
+  static inline const Category& get() noexcept {
+    static Category instance;
+    return instance;
+  }
 };
 
-inline const Category&
-category() noexcept {
-  static Category instance;
-  return instance;
-}
-
-} // namespace kero
+}  // namespace kero
 
 namespace std {
 
-[[nodiscard]] inline error_code
-make_error_code(kero::Errc e) noexcept {
-  return error_code{static_cast<int>(e), kero::category()};
+[[nodiscard]] inline error_code make_error_code(kero::Errc e) noexcept {
+  return error_code{static_cast<int>(e), kero::Category::get()};
 }
 
-} // namespace std
+}  // namespace std
 
 namespace kero {
 
 class Error {
-public:
+ public:
+  using Details = std::unordered_map<std::string, std::string>;
+
+  struct Data {
+    Details details;
+    std::string reason;
+    std::error_code error_code;
+    std::unique_ptr<Error> cause;
+
+    static_assert(sizeof(details) >= sizeof(reason));
+    static_assert(sizeof(reason) >= sizeof(error_code));
+    static_assert(sizeof(error_code) >= sizeof(cause));
+  };
+
   class Builder {
-  public:
-    inline Builder(std::error_code&& ec) noexcept : error_code_{std::move(ec)} {
+   public:
+    inline Builder(std::unique_ptr<Data>&& data) noexcept
+        : data_{std::move(data)} {
+      check();
     }
 
     Builder(const Builder&) = delete;
@@ -92,44 +105,41 @@ public:
     Builder& operator=(const Builder&) = delete;
     Builder& operator=(Builder&&) = delete;
 
-    constexpr Builder&&
-    reason(std::string&& reason) && noexcept {
-      reason_ = std::move(reason);
+    constexpr Builder&& reason(std::string&& reason) && noexcept {
+      check();
+      data_->reason = std::move(reason);
       return std::move(*this);
     }
 
-    constexpr Builder&&
-    detail(std::string&& key, std::string&& val) && noexcept {
-      details_.insert({std::move(key), std::move(val)});
+    constexpr Builder&& detail(std::string&& key,
+                               std::string&& val) && noexcept {
+      check();
+      data_->details.insert({std::move(key), std::move(val)});
       return std::move(*this);
     }
 
     template <typename T>
-    Builder&&
-    detail(std::string&& key, T&& val) && noexcept {
+    Builder&& detail(std::string&& key, T&& val) && noexcept {
+      check();
       std::stringstream ss;
       ss << std::forward<T&&>(val);
-      details_.insert({std::move(key), ss.str()});
+      data_->details.insert({std::move(key), ss.str()});
       return std::move(*this);
     }
 
-    [[nodiscard]] inline Error
-    build() && noexcept {
-      return Error{std::move(*this)};
+    [[nodiscard]] inline Error build() && noexcept {
+      check();
+      return Error{std::move(this->data_)};
     }
 
-  private:
-    std::error_code error_code_;
-    std::string reason_;
-    std::unordered_map<std::string, std::string> details_;
+   private:
+    constexpr void check() const noexcept { assert(data_); }
 
-    friend Error;
+    std::unique_ptr<Data> data_;
   };
 
-  inline Error(Builder&& builder) noexcept
-      : error_code_{std::move(builder.error_code_)},
-        reason_{std::move(builder.reason_)},
-        details_{std::move(builder.details_)} {
+  inline Error(std::unique_ptr<Data>&& data) noexcept : data_{std::move(data)} {
+    check();
   }
 
   Error(const Error&) = delete;
@@ -140,61 +150,83 @@ public:
   Error& operator=(const Error&) = delete;
   Error& operator=(Error&&) noexcept = default;
 
-  inline const std::error_code
-  error_code() const noexcept {
-    return error_code_;
+  inline const std::error_code& error_code() const& noexcept {
+    check();
+    return data_->error_code;
   }
 
-  constexpr const std::string&
-  reason() const& noexcept {
-    return reason_;
+  constexpr const std::string& reason() const& noexcept {
+    check();
+    return data_->reason;
   }
 
-  inline const std::unordered_map<std::string, std::string>&
-  details() const& noexcept {
-    return details_;
+  inline const Details& details() const& noexcept {
+    check();
+    return data_->details;
   }
 
-private:
-  std::error_code error_code_;
-  std::string reason_;
-  std::unordered_map<std::string, std::string> details_;
+  inline const std::unique_ptr<Error>& cause() const& noexcept {
+    check();
+    return data_->cause;
+  }
+
+  inline std::unique_ptr<Error> into_cause() && noexcept {
+    check();
+    return std::make_unique<Error>(std::move(*this));
+  }
+
+ private:
+  constexpr void check() const noexcept { assert(data_); }
+
+  std::unique_ptr<Data> data_;
 };
 
-[[nodiscard]] inline Error::Builder
-err(int errnum) noexcept {
-  return Error::Builder{std::error_code{errnum, std::system_category()}};
+template <typename T>
+[[nodiscard]] inline Error::Builder err(
+    T e, std::unique_ptr<Error>&& cause = {}) noexcept {
+  return Error::Builder{std::make_unique<Error::Data>(Error::Data{
+      .error_code = std::make_error_code(e),
+      .cause = std::move(cause),
+  })};
 }
 
-[[nodiscard]] inline Error::Builder
-err(std::errc e) noexcept {
-  return Error::Builder{std::make_error_code(e)};
+template <>
+[[nodiscard]] inline Error::Builder err<int>(
+    int errnum, std::unique_ptr<Error>&& cause) noexcept {
+  return Error::Builder{std::make_unique<Error::Data>(Error::Data{
+      .error_code = std::error_code{errnum, std::system_category()},
+      .cause = std::move(cause),
+  })};
 }
 
-[[nodiscard]] inline Error::Builder
-err(Errc e) noexcept {
-  return Error::Builder{std::make_error_code(e)};
-}
-
-} // namespace kero
+}  // namespace kero
 
 namespace std {
 
-inline ostream&
-operator<<(ostream& os, const kero::Error& val) noexcept {
+inline ostream& operator<<(ostream& os, const kero::Error& val) noexcept {
   os << "Error{";
-  os << "error_code:" << val.error_code() << ",";
-  os << "reason:" << val.reason() << ",";
-  os << "details:{";
-  auto&& details = val.details();
-  for (auto it = details.begin(); it != details.end(); it++) {
-    os << it->first << ":" << it->second;
-    if (std::next(it) != details.end())
-      os << ",";
+  os << "error_code:" << val.error_code();
+
+  const auto& reason = val.reason();
+  if (!reason.empty()) os << ",reason:" << reason;
+
+  const auto& details = val.details();
+  if (!details.empty()) {
+    os << ",details:{";
+    for (auto it = details.begin(); it != details.end(); it++) {
+      os << it->first << ":" << it->second;
+      if (std::next(it) != details.end()) os << ",";
+    }
+    os << "}";
   }
-  os << "}";
+
+  const auto& cause = val.cause();
+  if (cause) os << ",cause:" << cause;
+
   os << "}";
   return os;
 }
 
-} // namespace std
+}  // namespace std
+
+#endif  // KERO_ERROR_H_
