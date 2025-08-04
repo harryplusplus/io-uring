@@ -141,10 +141,10 @@ EventLoop::open_epoll() noexcept {
   closers_.push_back([this]() noexcept {
     if (epoll_fd_ != invalid_fd) {
       if (int ret = close(epoll_fd_); ret == -1) {
-        const int errnum = errno;
-        std::cerr << "close failed. errnum: " << errnum
+        std::cerr << "Failed to close epoll fd. errnum: " << errno
                   << ", epoll_fd: " << epoll_fd_ << ".\n";
       }
+      epoll_fd_ = invalid_fd;
     }
   });
   epoll_fd_ = ret;
@@ -158,11 +158,7 @@ EventLoop::open_event_fd() const noexcept {
   if (ret == -1)
     return err(errno).reason("eventfd failed.").build();
 
-  auto event_fd = Fd::from_raw_fd(ret);
-  if (!event_fd)
-    return std::move(event_fd).error();
-
-  return event_fd;
+  return ret;
 }
 
 Result<void, Error>
