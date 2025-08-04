@@ -9,6 +9,7 @@ namespace kero {
 
 enum class Errc : int {
   unexpected_error = 1000,
+  already_opened,
 };
 
 constexpr bool
@@ -26,6 +27,8 @@ operator<<(ostream& os, kero::Errc val) noexcept {
   switch (val) {
   case kero::Errc::unexpected_error:
     return os << "unexpected_error";
+  case kero::Errc::already_opened:
+    return os << "already_opened";
   }
 }
 

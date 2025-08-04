@@ -4,39 +4,22 @@
 #include <liburing.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <unistd.h>
 
 #include "closer.h"
 
 using namespace kero;
 
 EventLoop::~EventLoop() noexcept {
-  // TODO
+  [[maybe_unused]] auto res = stop();
 }
 
 Result<void, Error>
-EventLoop::run() noexcept {
-  int ret = epoll_create1(EPOLL_CLOEXEC);
-  if (ret == -1)
-    return err(errno).reason("epoll_create1 failed.").build();
+EventLoop::run(const Config& config) noexcept {
+  if (auto res = open_epoll(); !res)
+    return std::move(res).error();
 
-  const Fd epoll_fd = ret;
-  Closer close_epoll_fd{[epoll_fd]() noexcept {
-    const int ret = close(epoll_fd);
-    if (ret == -1)
-      std::cerr << err(errno)
-                       .reason("epoll_fd close failed.")
-                       .detail("epoll_fd", epoll_fd)
-                       .build()
-                << "\n";
-  }};
-
-  struct io_uring ring{};
-  ret = io_uring_queue_init(8, &ring, IORING_SETUP_SQPOLL);
-  if (ret < 0)
-    return err(-ret).reason("io_uring_queue_init failed.").build();
-
-  Closer close_ring{[&ring]() noexcept { io_uring_queue_exit(&ring); }};
+  if (auto res = open_io_uring(config.io_uring_queue_entries); !res)
+    return std::move(res).error();
 
   ret = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
   if (ret == -1)
@@ -100,5 +83,51 @@ EventLoop::run() noexcept {
     }
   }
 
+  return {};
+}
+
+Result<void, Error>
+EventLoop::stop() noexcept {
+  if (ring_)
+    io_uring_queue_exit(ring_.get());
+
+  epoll_fd_.close();
+}
+
+Result<void, Error>
+EventLoop::open_epoll() noexcept {
+  if (epoll_fd_)
+    return err(Errc::already_opened)
+        .reason("epoll already opened.")
+        .detail("epoll_fd", epoll_fd_)
+        .build();
+
+  const int ret = epoll_create1(EPOLL_CLOEXEC);
+  if (ret == -1)
+    return err(errno).reason("epoll_create1 failed.").build();
+
+  auto epoll_fd = Fd::from_raw_fd(ret);
+  if (!epoll_fd)
+    return std::move(epoll_fd).error();
+
+  epoll_fd_ = *std::move(epoll_fd);
+  return {};
+}
+
+Result<void, Error>
+EventLoop::open_io_uring(uint io_uring_queue_entries) noexcept {
+  if (ring_)
+    return err(Errc::already_opened).reason("io_uring already opened.").build();
+
+  auto ring = std::make_unique<struct io_uring>();
+  const int ret = io_uring_queue_init(io_uring_queue_entries, ring.get(),
+                                      IORING_SETUP_SQPOLL);
+  if (ret < 0)
+    return err(-ret)
+        .reason("io_uring_queue_init failed.")
+        .detail("io_uring_queue_entries", io_uring_queue_entries)
+        .build();
+
+  ring_ = std::move(ring);
   return {};
 }
