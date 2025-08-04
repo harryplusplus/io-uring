@@ -1,5 +1,1 @@
-AllowShortFunctionsOnASingleLine: None
-PointerAlignment: Left
-ReferenceAlignment: Left
-AlwaysBreakTemplateDeclarations: true
-AlwaysBreakAfterReturnType: AllDefinitions
+BasedOnStyle: Google
