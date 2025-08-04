@@ -15,11 +15,16 @@ EventLoop::~EventLoop() noexcept {
 
 Result<void, Error>
 EventLoop::run(const Config& config) noexcept {
+  if (auto res = open_io_uring(config.io_uring_queue_entries); !res)
+    return std::move(res).error();
+
   if (auto res = open_epoll(); !res)
     return std::move(res).error();
 
-  if (auto res = open_io_uring(config.io_uring_queue_entries); !res)
-    return std::move(res).error();
+  if (io_uring_event_fd_)
+    return err(Errc::already_opened).reason("").build();
+
+  auto event_fd = open_event_fd();
 
   ret = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
   if (ret == -1)
@@ -88,15 +93,42 @@ EventLoop::run(const Config& config) noexcept {
 
 Result<void, Error>
 EventLoop::stop() noexcept {
-  if (ring_)
-    io_uring_queue_exit(ring_.get());
+  for (auto it = closers_.rbegin(); it != closers_.rend(); it++) {
+    auto&& fn = *it;
+    if (fn)
+      fn();
+  }
+  closers_.clear();
+}
 
-  epoll_fd_.close();
+Result<void, Error>
+EventLoop::open_io_uring(uint io_uring_queue_entries) noexcept {
+  if (ring_)
+    return err(Errc::already_opened).reason("io_uring already opened.").build();
+
+  auto ring = std::make_unique<struct io_uring>();
+  if (int ret = io_uring_queue_init(io_uring_queue_entries, ring.get(),
+                                    IORING_SETUP_SQPOLL);
+      ret < 0)
+    return err(-ret)
+        .reason("io_uring_queue_init failed.")
+        .detail("io_uring_queue_entries", io_uring_queue_entries)
+        .build();
+
+  closers_.push_back([this]() noexcept {
+    if (ring_) {
+      io_uring_queue_exit(ring_.get());
+      ring_.reset();
+    }
+  });
+  ring_ = std::move(ring);
+
+  return {};
 }
 
 Result<void, Error>
 EventLoop::open_epoll() noexcept {
-  if (epoll_fd_)
+  if (epoll_fd_ != invalid_fd)
     return err(Errc::already_opened)
         .reason("epoll already opened.")
         .detail("epoll_fd", epoll_fd_)
@@ -106,28 +138,62 @@ EventLoop::open_epoll() noexcept {
   if (ret == -1)
     return err(errno).reason("epoll_create1 failed.").build();
 
-  auto epoll_fd = Fd::from_raw_fd(ret);
-  if (!epoll_fd)
-    return std::move(epoll_fd).error();
+  closers_.push_back([this]() noexcept {
+    if (epoll_fd_ != invalid_fd) {
+      if (int ret = close(epoll_fd_); ret == -1) {
+        const int errnum = errno;
+        std::cerr << "close failed. errnum: " << errnum
+                  << ", epoll_fd: " << epoll_fd_ << ".\n";
+      }
+    }
+  });
+  epoll_fd_ = ret;
 
-  epoll_fd_ = *std::move(epoll_fd);
   return {};
 }
 
-Result<void, Error>
-EventLoop::open_io_uring(uint io_uring_queue_entries) noexcept {
-  if (ring_)
-    return err(Errc::already_opened).reason("io_uring already opened.").build();
+Result<Fd, Error>
+EventLoop::open_event_fd() const noexcept {
+  const int ret = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+  if (ret == -1)
+    return err(errno).reason("eventfd failed.").build();
 
-  auto ring = std::make_unique<struct io_uring>();
-  const int ret = io_uring_queue_init(io_uring_queue_entries, ring.get(),
-                                      IORING_SETUP_SQPOLL);
-  if (ret < 0)
-    return err(-ret)
-        .reason("io_uring_queue_init failed.")
-        .detail("io_uring_queue_entries", io_uring_queue_entries)
+  auto event_fd = Fd::from_raw_fd(ret);
+  if (!event_fd)
+    return std::move(event_fd).error();
+
+  return event_fd;
+}
+
+Result<void, Error>
+EventLoop::open_io_uring_event_fd() noexcept {
+  if (io_uring_event_fd_)
+    return err(Errc::already_opened)
+        .reason("io_uring event fd already opened.")
+        .detail("io_uring_event_fd", io_uring_event_fd_)
         .build();
 
-  ring_ = std::move(ring);
+  auto res = open_event_fd();
+  if (!res)
+    return std::move(res).error();
+
+  Fd event_fd = *std::move(res);
+  if (int ret = io_uring_register_eventfd_async(ring_.get(), *event_fd);
+      ret < 0)
+    return err(-ret)
+        .reason("io_uring_register_eventfd_async failed.")
+        .detail("event_fd", event_fd)
+        .build();
+
+  // unregister
+
+  struct epoll_event ev{.events = EPOLLIN | EPOLLET, .data = {.fd = *event_fd}};
+  if (int ret = epoll_ctl(*epoll_fd_, EPOLL_CTL_ADD, *event_fd, &ev); ret == -1)
+    return err(errno)
+        .reason("Failed to add io_uring event fd to epoll.")
+        .build();
+
+  // unregister
+
   return {};
 }
