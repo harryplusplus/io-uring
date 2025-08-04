@@ -51,9 +51,8 @@ class Fd {
   static inline Result<Fd, Error> from_raw_fd(RawFd raw_fd) noexcept {
     if (raw_fd < 0)
       return err(std::errc::invalid_argument)
-          .reason("raw_fd is less than 0.")
           .detail("raw_fd", raw_fd)
-          .build();
+          .reason("raw_fd is less than 0.");
 
     return Fd{raw_fd};
   }
@@ -67,5 +66,18 @@ class Fd {
 };
 
 }  // namespace kero
+
+namespace std {
+
+inline ostream& operator<<(ostream& os, const kero::Fd& val) noexcept {
+  os << "Fd{";
+
+  if (val) os << "raw_fd:" << *val;
+
+  os << "}";
+  return os;
+}
+
+}  // namespace std
 
 #endif  // KERO_FD_H_

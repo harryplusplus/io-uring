@@ -105,12 +105,6 @@ class Error {
     Builder& operator=(const Builder&) = delete;
     Builder& operator=(Builder&&) = delete;
 
-    constexpr Builder&& reason(std::string&& reason) && noexcept {
-      check();
-      data_->reason = std::move(reason);
-      return std::move(*this);
-    }
-
     constexpr Builder&& detail(std::string&& key,
                                std::string&& val) && noexcept {
       check();
@@ -127,8 +121,9 @@ class Error {
       return std::move(*this);
     }
 
-    [[nodiscard]] inline Error build() && noexcept {
+    [[nodiscard]] inline Error reason(std::string&& reason) && noexcept {
       check();
+      data_->reason = std::move(reason);
       return Error{std::move(this->data_)};
     }
 

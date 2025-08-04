@@ -38,9 +38,11 @@ class Result {
 
   constexpr value_type& operator*() & noexcept { return value(); }
 
-  constexpr const value_type&& operator*() const&& noexcept { return value(); }
+  constexpr const value_type&& operator*() const&& noexcept {
+    return std::move(value());
+  }
 
-  constexpr value_type&& operator*() && noexcept { return value(); }
+  constexpr value_type&& operator*() && noexcept { return std::move(value()); }
 
   constexpr explicit operator bool() const noexcept { return is_ok(); }
 
@@ -66,12 +68,12 @@ class Result {
 
   constexpr value_type&& value() && noexcept {
     assert(is_ok());
-    return std::get<value_type>(std::move(data_));
+    return std::move(std::get<value_type>(data_));
   }
 
   constexpr const value_type&& value() const&& noexcept {
     assert(is_ok());
-    return std::get<value_type>(std::move(data_));
+    return std::move(std::get<value_type>(data_));
   }
 
   constexpr error_type& error() & noexcept {
@@ -86,12 +88,12 @@ class Result {
 
   constexpr error_type&& error() && noexcept {
     assert(is_err());
-    return std::get<error_type>(std::move(data_));
+    return std::move(std::get<error_type>(data_));
   }
 
   constexpr const error_type&& error() const&& noexcept {
     assert(is_err());
-    return std::get<error_type>(std::move(data_));
+    return std::move(std::get<error_type>(data_));
   }
 
  private:
@@ -138,12 +140,12 @@ class Result<void, E> {
 
   constexpr error_type&& error() && noexcept {
     assert(is_err());
-    return std::get<error_type>(data_);
+    return std::move(std::get<error_type>(data_));
   }
 
   constexpr const error_type&& error() const&& noexcept {
     assert(is_err());
-    return std::get<error_type>(data_);
+    return std::move(std::get<error_type>(data_));
   }
 
  private:
