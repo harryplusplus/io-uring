@@ -10,15 +10,8 @@
 
 using namespace kero;
 
-EventLoop::EventLoop(EventLoop&& other) noexcept
-    : ring_{std::move(other.ring_)} {
-}
-
-EventLoop&
-EventLoop::operator=(EventLoop&& other) noexcept {
-}
-
 EventLoop::~EventLoop() noexcept {
+  // TODO
 }
 
 Result<void, Error>
