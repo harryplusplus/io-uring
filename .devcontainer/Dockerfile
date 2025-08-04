@@ -20,14 +20,21 @@ RUN apt update && \
     linux-perf \
     liburing-dev \
     libfmt-dev \
+    # for cmake-format
+    pipx \
     # To open in a browser on the host
     xdg-utils \
     && apt clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -s /usr/bin/lldb-vscode-14 /usr/bin/lldb-dap
+    rm -rf /var/lib/apt/lists/*
+
+RUN ln -s /usr/bin/lldb-vscode-14 /usr/bin/lldb-dap
 
 USER vscode
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
+
+RUN pipx ensurepath && \
+    pipx install cmakelang
+
 RUN echo 'alias ll="ls -a -p -lh"' >> ~/.bashrc
 
 WORKDIR /work

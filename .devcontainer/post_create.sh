@@ -27,3 +27,6 @@ perf --version
 
 rustc --version
 cargo --version
+
+pipx --version
+cmake-format --version

@@ -9,6 +9,7 @@
     "vadimcn.vscode-lldb",
     "eamodio.gitlens",
     "ms-vscode.cpptools",
-    "ms-vscode.cmake-tools"
+    "ms-vscode.cmake-tools",
+    "cheshirekow.cmake-format"
   ]
 }

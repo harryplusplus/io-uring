@@ -3,5 +3,6 @@
   "overrideCommand": true,
   "postCreateCommand": ".devcontainer/post_create.sh",
   "service": "work",
+  "waitFor": "postCreateCommand",
   "workspaceFolder": "/work"
 }
