@@ -1,5 +1,5 @@
-#ifndef KERO_STATUS_H_
-#define KERO_STATUS_H_
+#ifndef KERO_ERROR_H_
+#define KERO_ERROR_H_
 
 #include <source_location>
 #include <sstream>
@@ -71,27 +71,27 @@ inline std::error_code CreateErrorCode(int errnum) noexcept {
   return std::error_code{errnum, std::system_category()};
 }
 
-class Status {
+class Error {
  public:
-  Status() noexcept = default;
+  Error() noexcept = default;
 
-  inline Status(ErrorCode e, std::source_location location =
-                                 std::source_location::current()) noexcept
+  inline Error(ErrorCode e, std::source_location location =
+                                std::source_location::current()) noexcept
       : code_{e}, location_{location} {}
-  inline Status(std::errc e, std::source_location location =
-                                 std::source_location::current()) noexcept
+  inline Error(std::errc e, std::source_location location =
+                                std::source_location::current()) noexcept
       : code_{e}, location_{location} {}
-  inline Status(int e, std::source_location location =
-                           std::source_location::current()) noexcept
+  inline Error(int e, std::source_location location =
+                          std::source_location::current()) noexcept
       : code_{CreateErrorCode(e)}, location_{location} {}
 
-  Status(const Status&) noexcept = default;
-  Status(Status&&) noexcept = default;
+  Error(const Error&) = delete;
+  Error(Error&&) noexcept = default;
 
-  ~Status() noexcept = default;
+  ~Error() noexcept = default;
 
-  Status& operator=(const Status&) noexcept = default;
-  Status& operator=(Status&&) noexcept = default;
+  Error& operator=(const Error&) = delete;
+  Error& operator=(Error&&) noexcept = default;
 
   inline explicit operator bool() const noexcept {
     return code_.operator bool();
@@ -107,4 +107,4 @@ class Status {
 
 }  // namespace kero
 
-#endif  // KERO_STATUS_H_
+#endif  // KERO_ERROR_H_

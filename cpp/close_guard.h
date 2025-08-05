@@ -3,35 +3,37 @@
 
 #include <functional>
 
+template <std::invocable F>
+  requires std::is_nothrow_invocable_r_v<void, F>
 class CloseGuard {
  public:
-  CloseGuard() noexcept = default;
-
-  inline CloseGuard(std::function<void()>&& close) noexcept
-      : close_{std::move(close)} {}
+  constexpr CloseGuard(F&& on_close) noexcept
+      : on_close_{std::forward<F>(on_close)}, is_closed_{false} {}
 
   CloseGuard(const CloseGuard&) = delete;
   CloseGuard(CloseGuard&&) = delete;
 
-  inline ~CloseGuard() noexcept { Close(); }
+  constexpr ~CloseGuard() noexcept { Close(); }
 
   CloseGuard& operator=(const CloseGuard&) = delete;
   CloseGuard& operator=(CloseGuard&&) = delete;
 
-  explicit inline operator bool() const noexcept { return !IsClosed(); }
+  explicit constexpr operator bool() const noexcept { return !IsClosed(); }
 
-  inline void Close() noexcept {
+  constexpr void Close() noexcept {
     if (!IsClosed()) {
-      std::function<void()> close = close_;
-      close_ = {};
-      close();
+      is_closed_ = true;
+      std::invoke(std::move(on_close_));
     }
   }
 
-  inline bool IsClosed() const noexcept { return !close_; }
+  constexpr bool IsClosed() const noexcept { return is_closed_; }
 
  private:
-  std::function<void()> close_;
+  F on_close_;
+  bool is_closed_;
+
+  static_assert(sizeof(on_close_) >= sizeof(is_closed_));
 };
 
 #endif  // KERO_CLOSE_GUARD_H_

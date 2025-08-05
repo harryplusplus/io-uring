@@ -13,57 +13,48 @@ class Fd {
   Fd() noexcept = default;
 
   constexpr Fd(RawFd raw_fd) noexcept : raw_fd_{raw_fd} {
-    assert(raw_fd_ > invalid_raw_fd);
+    assert(raw_fd_ > kInvalidRawFd);
   }
 
   Fd(const Fd&) = delete;
 
   constexpr Fd(Fd&& other) noexcept : raw_fd_{other.raw_fd_} {
-    other.raw_fd_ = invalid_raw_fd;
+    other.raw_fd_ = kInvalidRawFd;
   }
 
-  inline ~Fd() noexcept { reset(); }
+  inline ~Fd() noexcept { Close(); }
 
   Fd& operator=(const Fd&) = delete;
 
   constexpr Fd& operator=(Fd&& other) noexcept {
     if (this != &other) {
-      reset();
+      this->~Fd();
       raw_fd_ = other.raw_fd_;
-      other.raw_fd_ = invalid_raw_fd;
+      other.raw_fd_ = kInvalidRawFd;
     }
     return *this;
   }
 
-  constexpr RawFd operator*() const noexcept { return value(); }
+  constexpr RawFd operator*() const noexcept { return Value(); }
 
-  constexpr explicit operator bool() const noexcept { return has_value(); }
+  constexpr explicit operator bool() const noexcept { return HasValue(); }
 
-  constexpr bool has_value() const noexcept { return is_valid_raw_fd(); }
+  constexpr bool HasValue() const noexcept { return raw_fd_ != kInvalidRawFd; }
 
-  constexpr RawFd value() const noexcept { return as_raw_fd(); }
+  constexpr RawFd Value() const noexcept { return raw_fd_; }
 
-  constexpr void reset() noexcept { close(); }
+  void Close() noexcept;
 
-  void close() noexcept;
-
-  constexpr bool is_valid_raw_fd() const noexcept {
-    return raw_fd_ != invalid_raw_fd;
-  }
-
-  constexpr RawFd as_raw_fd() const noexcept { return raw_fd_; }
-
-  static constexpr RawFd invalid_raw_fd = -1;
+  static constexpr RawFd kInvalidRawFd = -1;
 
  private:
-  RawFd raw_fd_ = invalid_raw_fd;
+  RawFd raw_fd_ = kInvalidRawFd;
 };
 
 }  // namespace kero
 
-namespace std {
-
-inline ostream& operator<<(ostream& os, const kero::Fd& val) noexcept {
+inline std::ostream& operator<<(std::ostream& os,
+                                const kero::Fd& val) noexcept {
   os << "Fd{";
 
   if (val) os << "raw_fd:" << *val;
@@ -71,7 +62,5 @@ inline ostream& operator<<(ostream& os, const kero::Fd& val) noexcept {
   os << "}";
   return os;
 }
-
-}  // namespace std
 
 #endif  // KERO_FD_H_
