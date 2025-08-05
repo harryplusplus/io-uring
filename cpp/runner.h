@@ -2,7 +2,9 @@
 #define KERO_RUNNER_H_
 
 #include "config.h"
+#include "error.h"
 #include "fd.h"
+#include "result.h"
 
 namespace kero {
 

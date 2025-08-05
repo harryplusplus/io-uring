@@ -11,23 +11,18 @@ Result<Fd, Error> create_epoll_fd() noexcept {
   const int ret = ::epoll_create1(EPOLL_CLOEXEC);
   if (ret == -1) return err(errno).reason("Failed to epoll_create1.");
 
-  // if failed. leak.
-  if (auto res = Fd::from_raw_fd(ret); !res) {
-    return err(Errc::unexpected_error, std::move(res).error().into_cause())
-        .reason("Failed to create epoll_fd from raw_fd.");
-  }
+  return Fd{ret};
 }
 
 Result<Fd, Error> create_event_fd() noexcept {
   const int ret = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
   if (ret == -1) return err(errno).reason("Failed to eventfd.");
 
-  // leak.
-  return Fd::from_raw_fd(ret);
+  return Fd{ret};
 }
 
-Result<void, Error> add_event_fd_to_epoll(const Fd& epoll_fd,
-                                          const Fd& event_fd) noexcept {
+Result<Closer, Error> add_event_fd_to_epoll(const Fd& epoll_fd,
+                                            const Fd& event_fd) noexcept {
   if (!epoll_fd)
     return err(std::errc::invalid_argument).reason("Failed to get epoll_fd.");
 
