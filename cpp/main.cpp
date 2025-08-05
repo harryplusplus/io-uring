@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "error.h"
+#include "status.h"
 // #include "event_loop.h"
 // #include "result.h"
 // #include "signal_handler.h"
@@ -8,6 +8,12 @@
 using namespace kero;
 
 int main() {
+  // std::shared_ptr<Runner> runner = Runner::Create();
+  // StopGuard stop(runner);
+  // // runner.Run();
+  // signal.on(SIGINT, [runner]() { runner.stop(); });
+  // auto res =
+  //     With([]() noexcept {}, []() noexcept {}, [](resource) { return {}; });
   // SignalHandler::init();
 
   // auto res = EventLoop::create();

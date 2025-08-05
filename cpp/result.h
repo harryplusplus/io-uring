@@ -9,12 +9,12 @@ namespace kero {
 template <typename T, typename E>
 class Result {
  public:
-  using value_type = T;
-  using error_type = E;
+  using ValueType = T;
+  using ErrorType = E;
 
-  constexpr Result(value_type&& val) noexcept : data_{std::move(val)} {}
+  constexpr Result(ValueType&& val) noexcept : data_{std::move(val)} {}
 
-  constexpr Result(error_type&& err) noexcept : data_{std::move(err)} {}
+  constexpr Result(ErrorType&& err) noexcept : data_{std::move(err)} {}
 
   Result(const Result&) = delete;
   Result(Result&&) noexcept = default;
@@ -24,76 +24,76 @@ class Result {
   Result& operator=(const Result&) = delete;
   Result& operator=(Result&&) noexcept = default;
 
-  constexpr const value_type* operator->() const noexcept {
-    assert(is_ok());
-    return std::get_if<value_type>(&data_);
+  constexpr const ValueType* operator->() const noexcept {
+    assert(IsOk());
+    return std::get_if<ValueType>(&data_);
   }
 
-  constexpr value_type* operator->() noexcept {
-    assert(is_ok());
-    return std::get_if<value_type>(&data_);
+  constexpr ValueType* operator->() noexcept {
+    assert(IsOk());
+    return std::get_if<ValueType>(&data_);
   }
 
-  constexpr const value_type& operator*() const& noexcept { return value(); }
+  constexpr const ValueType& operator*() const& noexcept { return Value(); }
 
-  constexpr value_type& operator*() & noexcept { return value(); }
+  constexpr ValueType& operator*() & noexcept { return Value(); }
 
-  constexpr const value_type&& operator*() const&& noexcept {
-    return std::move(value());
+  constexpr const ValueType&& operator*() const&& noexcept {
+    return std::move(Value());
   }
 
-  constexpr value_type&& operator*() && noexcept { return std::move(value()); }
+  constexpr ValueType&& operator*() && noexcept { return std::move(Value()); }
 
-  constexpr explicit operator bool() const noexcept { return is_ok(); }
+  constexpr explicit operator bool() const noexcept { return IsOk(); }
 
-  constexpr bool has_value() const noexcept { return is_ok(); }
+  constexpr bool HasValue() const noexcept { return IsOk(); }
 
-  constexpr bool is_ok() const noexcept {
-    return std::holds_alternative<value_type>(data_);
+  constexpr bool IsOk() const noexcept {
+    return std::holds_alternative<ValueType>(data_);
   }
 
-  constexpr bool is_err() const noexcept {
-    return std::holds_alternative<error_type>(data_);
+  constexpr bool IsErr() const noexcept {
+    return std::holds_alternative<ErrorType>(data_);
   }
 
-  constexpr value_type& value() & noexcept {
-    assert(is_ok());
-    return std::get<value_type>(data_);
+  constexpr ValueType& Value() & noexcept {
+    assert(IsOk());
+    return std::get<ValueType>(data_);
   }
 
-  constexpr const value_type& value() const& noexcept {
-    assert(is_ok());
-    return std::get<value_type>(data_);
+  constexpr const ValueType& Value() const& noexcept {
+    assert(IsOk());
+    return std::get<ValueType>(data_);
   }
 
-  constexpr value_type&& value() && noexcept {
-    assert(is_ok());
-    return std::move(std::get<value_type>(data_));
+  constexpr ValueType&& Value() && noexcept {
+    assert(IsOk());
+    return std::move(std::get<ValueType>(data_));
   }
 
-  constexpr const value_type&& value() const&& noexcept {
-    assert(is_ok());
-    return std::move(std::get<value_type>(data_));
+  constexpr const ValueType&& Value() const&& noexcept {
+    assert(IsOk());
+    return std::move(std::get<ValueType>(data_));
   }
 
-  constexpr error_type& error() & noexcept {
-    assert(is_err());
-    return std::get<error_type>(data_);
+  constexpr ErrorType& Error() & noexcept {
+    assert(IsErr());
+    return std::get<ErrorType>(data_);
   }
 
-  constexpr const error_type& error() const& noexcept {
-    assert(is_err());
-    return std::get<error_type>(data_);
+  constexpr const ErrorType& Error() const& noexcept {
+    assert(IsErr());
+    return std::get<ErrorType>(data_);
   }
 
-  constexpr error_type&& error() && noexcept {
-    assert(is_err());
-    return std::move(std::get<error_type>(data_));
+  constexpr ErrorType&& Error() && noexcept {
+    assert(IsErr());
+    return std::move(std::get<ErrorType>(data_));
   }
 
-  constexpr const error_type&& error() const&& noexcept {
-    assert(is_err());
-    return std::move(std::get<error_type>(data_));
+  constexpr const ErrorType&& Error() const&& noexcept {
+    assert(IsErr());
+    return std::move(std::get<ErrorType>(data_));
   }
 
  private:
@@ -103,12 +103,12 @@ class Result {
 template <typename E>
 class Result<void, E> {
  public:
-  using value_type = void;
-  using error_type = E;
+  using ValueType = void;
+  using ErrorType = E;
 
   constexpr Result() noexcept : data_{std::monostate{}} {}
 
-  constexpr Result(error_type&& err) noexcept : data_{std::move(err)} {}
+  constexpr Result(ErrorType&& err) noexcept : data_{std::move(err)} {}
 
   Result(const Result&) = delete;
   Result(Result&&) noexcept = default;
@@ -118,34 +118,34 @@ class Result<void, E> {
   Result& operator=(const Result&) = delete;
   Result& operator=(Result&&) noexcept = default;
 
-  constexpr explicit operator bool() const noexcept { return is_ok(); }
+  constexpr explicit operator bool() const noexcept { return IsOk(); }
 
-  constexpr bool is_ok() const noexcept {
+  constexpr bool IsOk() const noexcept {
     return std::holds_alternative<std::monostate>(data_);
   }
 
-  constexpr bool is_err() const noexcept {
-    return std::holds_alternative<error_type>(data_);
+  constexpr bool IsErr() const noexcept {
+    return std::holds_alternative<ErrorType>(data_);
   }
 
-  constexpr error_type& error() & noexcept {
-    assert(is_err());
-    return std::get<error_type>(data_);
+  constexpr ErrorType& Error() & noexcept {
+    assert(IsErr());
+    return std::get<ErrorType>(data_);
   }
 
-  constexpr const error_type& error() const& noexcept {
-    assert(is_err());
-    return std::get<error_type>(data_);
+  constexpr const ErrorType& Error() const& noexcept {
+    assert(IsErr());
+    return std::get<ErrorType>(data_);
   }
 
-  constexpr error_type&& error() && noexcept {
-    assert(is_err());
-    return std::move(std::get<error_type>(data_));
+  constexpr ErrorType&& Error() && noexcept {
+    assert(IsErr());
+    return std::move(std::get<ErrorType>(data_));
   }
 
-  constexpr const error_type&& error() const&& noexcept {
-    assert(is_err());
-    return std::move(std::get<error_type>(data_));
+  constexpr const ErrorType&& Error() const&& noexcept {
+    assert(IsErr());
+    return std::move(std::get<ErrorType>(data_));
   }
 
  private:

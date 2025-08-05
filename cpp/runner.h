@@ -21,11 +21,11 @@ class Runner {
   constexpr Runner(Config&& config) noexcept : config_{std::move(config)} {}
 
   Status Run() noexcept;
-  Status Stop() const noexcept;
+  // Status Stop() const noexcept;
 
  private:
-  Status WithStopEventFdAdded(const EpollFd& epoll_fd,
-                              const StopEventFd& stop_event_fd) noexcept;
+  // Status WithStopEventFdAdded(const EpollFd& epoll_fd,
+  //                             const StopEventFd& stop_event_fd) noexcept;
 
   std::atomic<StopEventFd> stop_event_fd_{kInvalidFd};
   const Config config_;

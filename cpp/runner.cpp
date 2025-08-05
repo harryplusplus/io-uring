@@ -10,6 +10,7 @@
 
 #include "close_guard.h"
 #include "tag.h"
+#include "with.h"
 
 using namespace kero;
 
@@ -33,59 +34,63 @@ void DeleteEventFd(const EpollFd& epoll_fd, RawFd event_fd) noexcept {
               << " event_fd:" << event_fd << " epoll_fd:" << *epoll_fd << "\n";
 }
 
-Status Runner::WithStopEventFdAdded(const EpollFd& epoll_fd,
-                                    const StopEventFd& stop_event_fd) noexcept {
-  std::unique_ptr<io_uring> ring = std::make_unique<io_uring>();
-  const int ret = io_uring_queue_init(config.io_uring_queue_entries, ring.get(),
-                                      IORING_SETUP_SQPOLL);
-  return {};
-}
+// Status Runner::WithStopEventFdAdded(const EpollFd& epoll_fd,
+//                                     const StopEventFd& stop_event_fd)
+//                                     noexcept {
+//   std::unique_ptr<io_uring> ring = std::make_unique<io_uring>();
+//   const int ret = io_uring_queue_init(config.io_uring_queue_entries,
+//   ring.get(),
+//                                       IORING_SETUP_SQPOLL);
+//   return {};
+// }
 
-Status Runner::WithStopEventFd(const EpollFd& epoll_fd,
-                               const StopEventFd& stop_event_fd) noexcept {
-  const int ret = AddEventFd(epoll_fd, *stop_event_fd);
-  if (ret == -1) return errno;
+// Status Runner::WithStopEventFd(const EpollFd& epoll_fd,
+//                                const StopEventFd& stop_event_fd) noexcept {
+//   const int ret = AddEventFd(epoll_fd, *stop_event_fd);
+//   if (ret == -1) return errno;
 
-  CloseGuard close{[&epoll_fd, &stop_event_fd]() noexcept {
-    DeleteEventFd(epoll_fd, *stop_event_fd);
-  }};
+//   CloseGuard close{[&epoll_fd, &stop_event_fd]() noexcept {
+//     DeleteEventFd(epoll_fd, *stop_event_fd);
+//   }};
 
-  return WithStopEventFdAdded(epoll_fd, stop_event_fd);
-}
+//   return WithStopEventFdAdded(epoll_fd, stop_event_fd);
+// }
 
-Status Runner::WithEpollFd(const EpollFd& epoll_fd) noexcept {
-  const int ret = CreateEventFd();
-  if (ret == -1) return errno;
+// Status Runner::WithEpollFd(const EpollFd& epoll_fd) noexcept {
+//   const int ret = CreateEventFd();
+//   if (ret == -1) return errno;
 
-  StopEventFd stop_event_fd{ret};
-  CloseGuard close{[&stop_event_fd]() noexcept { CloseFd(*stop_event_fd); }};
+//   StopEventFd stop_event_fd{ret};
+//   CloseGuard close{[&stop_event_fd]() noexcept { CloseFd(*stop_event_fd); }};
 
-  return WithStopEventFd(epoll_fd, stop_event_fd);
-}
+//   return WithStopEventFd(epoll_fd, stop_event_fd);
+// }
 
 Status Runner::Run() noexcept {
-  const int ret = ::epoll_create1(EPOLL_CLOEXEC);
-  if (ret == -1) return errno;
+  return With([]() noexcept {}, []() noexcept {}, []() noexcept {});
 
-  EpollFd epoll_fd{ret};
-  CloseGuard close{[&epoll_fd]() noexcept { CloseFd(*epoll_fd); }};
+  // const int ret = ::epoll_create1(EPOLL_CLOEXEC);
+  // if (ret == -1) return errno;
 
-  return WithEpollFd(epoll_fd);
+  // EpollFd epoll_fd{ret};
+  // CloseGuard close{[&epoll_fd]() noexcept { CloseFd(*epoll_fd); }};
+
+  // return WithEpollFd(epoll_fd);
 }
 
-Status Runner::Stop() const noexcept {
-  if (stop_event_fd_ < 0) return std::errc::bad_file_descriptor;
+// Status Runner::Stop() const noexcept {
+//   if (stop_event_fd_ < 0) return std::errc::bad_file_descriptor;
 
-  const uint64_t data = 1;
-  static_assert(sizeof(data) == 8);
+//   const uint64_t data = 1;
+//   static_assert(sizeof(data) == 8);
 
-  const ssize_t ret = ::write(stop_event_fd_, &data, sizeof(data));
-  if (ret == -1) return errno;
+//   const ssize_t ret = ::write(stop_event_fd_, &data, sizeof(data));
+//   if (ret == -1) return errno;
 
-  if (ret != sizeof(data)) return ErrorCode::kUnexpectedError;
+//   if (ret != sizeof(data)) return ErrorCode::kUnexpectedError;
 
-  return {};
-}
+//   return {};
+// }
 
 // Result<Runner, Error> Runner::create(const Config& config) noexcept {
 //   const int ret = ::epoll_create1(EPOLL_CLOEXEC);
