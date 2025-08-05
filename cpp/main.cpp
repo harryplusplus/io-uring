@@ -10,25 +10,6 @@ using namespace kero;
 int main() {
   SignalHandler::init();
 
-  // auto res = create_event_fd();
-  // if (!res) {
-  //   std::cerr << std::move(res).error() << "\n";
-  //   return 1;
-  // }
-
-  // Fd stop_event_fd = *std::move(res);
-
-  // uint64_t data = 1;
-  // ssize_t ret = ::write(*stop_event_fd, &data, sizeof(data));
-  // if (ret == -1) {
-  //   const int errnum = errno;
-  //   // error
-  // } else if (ret == sizeof(data)) {
-  //   // ok
-  // } else {
-  //   // unexpected error
-  // }
-
   // auto res = EventLoop::create();
   // auto [runner, stopper] = *std::move(res);
   // auto t = std::jthread([]() { runner.run(); });
