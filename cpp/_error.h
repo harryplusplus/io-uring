@@ -13,6 +13,7 @@ namespace kero {
 enum class Errc : int {
   _begin = 1000,
   unexpected_error,
+  uninitialized_fd,
   _end,
 };
 

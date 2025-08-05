@@ -1,32 +1,36 @@
 #ifndef KERO_RUNNER_H_
 #define KERO_RUNNER_H_
 
+#include <atomic>
+
 #include "config.h"
-#include "error.h"
-#include "fd.h"
-#include "result.h"
+#include "status.h"
+#include "tag.h"
 
 namespace kero {
 
+using RawFd = int;
+
+static constexpr RawFd kInvalidFd = -1;
+
+using EpollFd = Tag<RawFd, struct EpollFdTag>;
+using StopEventFd = Tag<RawFd, struct StopEventFdTag>;
+
 class Runner {
  public:
-  Result<void, Error> run() noexcept;
-  Result<void, Error> stop() const noexcept;
+  constexpr Runner(Config&& config) noexcept : config_{std::move(config)} {}
 
-  static Result<Runner, Error> create(const Config& config) noexcept;
+  Status Run() noexcept;
+  Status Stop() const noexcept;
 
  private:
-  inline Runner(Fd&& epoll_fd, Fd&& stop_event_fd) noexcept
-      : epoll_fd_{std::move(epoll_fd)},
-        stop_event_fd_{std::move(stop_event_fd)} {
-    assert(epoll_fd_);
-    assert(stop_event_fd_);
-  }
+  Status WithStopEventFdAdded(const EpollFd& epoll_fd,
+                              const StopEventFd& stop_event_fd) noexcept;
 
-  Fd epoll_fd_;
-  Fd stop_event_fd_;
+  std::atomic<StopEventFd> stop_event_fd_{kInvalidFd};
+  Config config_;
 
-  static_assert(sizeof(epoll_fd_) >= sizeof(stop_event_fd_));
+  static_assert(sizeof(stop_event_fd_) >= sizeof(config_));
 };
 
 }  // namespace kero

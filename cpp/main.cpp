@@ -1,14 +1,14 @@
 #include <iostream>
 
 #include "error.h"
-#include "event_loop.h"
-#include "result.h"
-#include "signal_handler.h"
+// #include "event_loop.h"
+// #include "result.h"
+// #include "signal_handler.h"
 
 using namespace kero;
 
 int main() {
-  SignalHandler::init();
+  // SignalHandler::init();
 
   // auto res = EventLoop::create();
   // auto [runner, stopper] = *std::move(res);
