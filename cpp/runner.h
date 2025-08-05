@@ -28,7 +28,7 @@ class Runner {
                               const StopEventFd& stop_event_fd) noexcept;
 
   std::atomic<StopEventFd> stop_event_fd_{kInvalidFd};
-  Config config_;
+  const Config config_;
 
   static_assert(sizeof(stop_event_fd_) >= sizeof(config_));
 };
