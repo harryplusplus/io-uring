@@ -1,8 +1,8 @@
 #ifndef KERO_FD_H_
 #define KERO_FD_H_
 
-#include "error.h"
-#include "result.h"
+#include <cassert>
+#include <ostream>
 
 namespace kero {
 
@@ -11,6 +11,11 @@ using RawFd = int;
 class Fd {
  public:
   Fd() noexcept = default;
+
+  constexpr Fd(RawFd raw_fd) noexcept : raw_fd_{raw_fd} {
+    assert(raw_fd_ > invalid_raw_fd);
+  }
+
   Fd(const Fd&) = delete;
 
   constexpr Fd(Fd&& other) noexcept : raw_fd_{other.raw_fd_} {
@@ -48,20 +53,9 @@ class Fd {
 
   constexpr RawFd as_raw_fd() const noexcept { return raw_fd_; }
 
-  static inline Result<Fd, Error> from_raw_fd(RawFd raw_fd) noexcept {
-    if (raw_fd < 0)
-      return err(std::errc::invalid_argument)
-          .detail("raw_fd", raw_fd)
-          .reason("raw_fd is less than 0.");
-
-    return Fd{raw_fd};
-  }
-
   static constexpr RawFd invalid_raw_fd = -1;
 
  private:
-  constexpr Fd(RawFd raw_fd) noexcept : raw_fd_{raw_fd} {}
-
   RawFd raw_fd_ = invalid_raw_fd;
 };
 
