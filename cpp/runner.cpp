@@ -7,10 +7,22 @@
 
 using namespace kero;
 
+Result<Fd, Error> create_epoll_fd() noexcept {
+  const int ret = ::epoll_create1(EPOLL_CLOEXEC);
+  if (ret == -1) return err(errno).reason("Failed to epoll_create1.");
+
+  // if failed. leak.
+  if (auto res = Fd::from_raw_fd(ret); !res) {
+    return err(Errc::unexpected_error, std::move(res).error().into_cause())
+        .reason("Failed to create epoll_fd from raw_fd.");
+  }
+}
+
 Result<Fd, Error> create_event_fd() noexcept {
   const int ret = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
   if (ret == -1) return err(errno).reason("Failed to eventfd.");
 
+  // leak.
   return Fd::from_raw_fd(ret);
 }
 
@@ -57,6 +69,7 @@ Result<Runner, Error> Runner::create(const Config& config) noexcept {
   const int ret = ::epoll_create1(EPOLL_CLOEXEC);
   if (ret == -1) return err(errno).reason("Failed to epoll_create1.");
 
+  // leak.
   if (auto res = Fd::from_raw_fd(ret); !res) {
     return err(Errc::unexpected_error, std::move(res).error().into_cause())
         .reason("Failed to create epoll_fd from raw_fd.");
@@ -77,7 +90,7 @@ Result<Runner, Error> Runner::create(const Config& config) noexcept {
         return err(Errc::unexpected_error, std::move(res).error().into_cause())
             .reason("Failed to add stop_event_fd to epoll.");
 
-      // delete_event_fd
+      // delete_event_fd. leak.
 
       auto ring = std::make_unique<struct io_uring>();
       if (int ret = io_uring_queue_init(config.io_uring_queue_entries,
@@ -87,7 +100,7 @@ Result<Runner, Error> Runner::create(const Config& config) noexcept {
             .detail("io_uring_queue_entries", config.io_uring_queue_entries)
             .reason("io_uring_queue_init failed.");
 
-      // io_uring_queue_exit
+      // io_uring_queue_exit. leak.
     }
   }
 }
