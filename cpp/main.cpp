@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 
 #include "event_loop.h"
 // #include "signal_handler.h"
@@ -12,6 +13,13 @@ int main() {
     std::cerr << std::move(event_loop).error() << "\n";
     return 1;
   }
+
+  auto t =
+      std::thread{[event_loop = *std::move(event_loop)]() mutable noexcept {
+        event_loop.Run();
+      }};
+
+  t.join();
 
   // auto fd = Fd::open("test.txt", O_RDWR | O_CREAT, 0600);
   // if (!fd) {
