@@ -7,6 +7,7 @@ namespace kero {
 
 struct Config {
   uint io_uring_queue_entries = 1024;
+  size_t epoll_events_size = 1024;
 };
 
 }  // namespace kero

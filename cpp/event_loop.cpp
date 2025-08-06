@@ -90,8 +90,26 @@ expected<void, Error> RegisterIoUringEventFd(
 }
 
 expected<void, Error> EventLoop::Run() noexcept {
-  // TODO
-  return {};
+  while (true) {
+    const int ret =
+        epoll_wait(*epoll_fd_, epoll_events_.data(), epoll_events_.size(), -1);
+    if (ret == -1) {
+      const int errnum = errno;
+      if (errnum == EINTR) continue;
+
+      return unexpected{errnum};
+    }
+
+    for (int i = 0; i < ret; i++) {
+      auto&& ev = epoll_events_[i];
+      if (ev.data.fd == *stop_event_fd_) {
+      } else if (ev.data.fd == *io_uring_event_fd_) {
+      } else {
+        std::cerr << "Unexpected epoll event. u64:" << ev.data.u64
+                  << ", events:" << ev.events << "\n";
+      }
+    }
+  }
 }
 
 expected<void, Error> EventLoop::Stop() const noexcept {
@@ -137,5 +155,15 @@ expected<EventLoop, Error> EventLoop::Create(const Config& config) noexcept {
     return unexpected{std::move(res).error()};
 
   return EventLoop{*std::move(ring), *std::move(epoll_fd),
-                   *std::move(stop_event_fd), *std::move(io_uring_event_fd)};
+                   *std::move(stop_event_fd), *std::move(io_uring_event_fd),
+                   config.epoll_events_size};
 }
+
+EventLoop::EventLoop(IoUring&& ring, EpollFd&& epoll_fd,
+                     StopEventFd&& stop_event_fd,
+                     IoUringEventFd&& io_uring_event_fd,
+                     size_t epoll_events_size) noexcept
+    : ring_{std::move(ring)},
+      epoll_fd_{std::move(epoll_fd)},
+      stop_event_fd_{std::move(stop_event_fd)},
+      io_uring_event_fd_{std::move(io_uring_event_fd)} {}

@@ -9,6 +9,7 @@
 #include "expected.h"
 
 struct io_uring;
+struct epoll_event;
 
 namespace kero {
 
@@ -52,13 +53,9 @@ class EventLoop {
   static expected<EventLoop, Error> Create(const Config& config) noexcept;
 
  private:
-  inline EventLoop(IoUring&& ring, EpollFd&& epoll_fd,
-                   StopEventFd&& stop_event_fd,
-                   IoUringEventFd&& io_uring_event_fd) noexcept
-      : ring_{std::move(ring)},
-        epoll_fd_{std::move(epoll_fd)},
-        stop_event_fd_{std::move(stop_event_fd)},
-        io_uring_event_fd_{std::move(io_uring_event_fd)} {}
+  EventLoop(IoUring&& ring, EpollFd&& epoll_fd, StopEventFd&& stop_event_fd,
+            IoUringEventFd&& io_uring_event_fd,
+            size_t epoll_events_size) noexcept;
 
   IoUring ring_;
   EpollFd epoll_fd_;

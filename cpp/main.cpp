@@ -1,33 +1,17 @@
 #include <iostream>
 
-#include "error.h"
-#include "expected.h"
-
-// #include "event_loop.h"
-// #include "result.h"
+#include "event_loop.h"
 // #include "signal_handler.h"
 
 using namespace kero;
 
 int main() {
-  // std::shared_ptr<Runner> runner = Runner::Create();
-  // StopGuard stop(runner);
-  // // runner.Run();
-  // signal.on(SIGINT, [runner]() { runner.stop(); });
-  // auto res =
-  //     With([]() noexcept {}, []() noexcept {}, [](resource) { return {};
-  //     });
-  // SignalHandler::init();
-
-  // auto res = EventLoop::create();
-  // auto [runner, stopper] = *std::move(res);
-  // auto t = std::jthread([]() { runner.run(); });
-  // stopper.stop();
-
-  // if (auto err = run(); err) {
-  //   fmt::print(stderr, "Run failed. error: {}\n", err);
-  //   return 1;
-  // }
+  Config config;
+  auto event_loop = EventLoop::Create(config);
+  if (!event_loop) {
+    std::cerr << std::move(event_loop).error() << "\n";
+    return 1;
+  }
 
   // auto fd = Fd::open("test.txt", O_RDWR | O_CREAT, 0600);
   // if (!fd) {

@@ -94,11 +94,13 @@ class Error {
   Error& operator=(Error&&) noexcept = default;
 
   inline explicit operator bool() const noexcept {
-    return code_.operator bool();
+    return static_cast<bool>(code_);
   }
 
-  inline std::error_code Code() const noexcept { return code_; }
-  constexpr std::source_location Location() const noexcept { return location_; }
+  inline const std::error_code& Code() const noexcept { return code_; }
+  constexpr const std::source_location& Location() const noexcept {
+    return location_;
+  }
 
  private:
   std::error_code code_;
@@ -106,5 +108,25 @@ class Error {
 };
 
 }  // namespace kero
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const std::source_location& val) noexcept {
+  os << val.file_name() << ":" << val.line() << ":" << val.column() << " "
+     << val.function_name();
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const kero::Error& val) noexcept {
+  os << "Error{";
+
+  if (val) {
+    os << "Code:" << val.Code() << ",";
+    os << "Location:" << val.Location();
+  }
+
+  os << "}";
+  return os;
+}
 
 #endif  // KERO_ERROR_H_
